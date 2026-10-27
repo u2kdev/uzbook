@@ -8,6 +8,8 @@ import { CopyLink } from "@/components/dashboard/copy-link";
 import { formatMoney } from "@/lib/plans";
 import { getOwnerServices } from "@/server/business/public";
 
+import { QuickActions } from "@/components/dashboard/quick-actions";
+
 export const dynamic = "force-dynamic";
 
 function capitalize(input: string) {
@@ -85,11 +87,24 @@ export default async function DashboardPage({
               <ArrowRight size={15} strokeWidth={1.7} />
             </Link>
           </div>
-          <Link href="/dashboard/bookings" className="btn btn-primary h-10 text-[12.5px]">
-            <Plus size={15} strokeWidth={1.8} /> Новая запись
-          </Link>
+
+          <QuickActions
+            staff={schedule.staff.map((s) => ({ id: s.id, name: s.name }))}
+            date={date}
+          />
         </div>
       </div>
+
+      {/* Late arrivals alert */}
+      {stats.late > 0 && (
+        <div className="flex items-center gap-3 rounded-2xl border border-amber/30 bg-amber/10 px-4 py-3 text-amber">
+          <TriangleAlert size={18} className="shrink-0" />
+          <div className="text-[12.5px]">
+            <span className="font-semibold">{stats.late} {stats.late === 1 ? "клиент опаздывает" : "клиента опаздывают"} прямо сейчас.</span>{" "}
+            Проверьте таймлайн и свяжитесь с клиентом по телефону.
+          </div>
+        </div>
+      )}
 
       {services.length === 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber/25 bg-amber/5 px-4 py-3.5">
@@ -106,27 +121,27 @@ export default async function DashboardPage({
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
           {
-            label: "Записей",
+            label: "Записей на день",
             value: String(stats.count),
-            hint: stats.pending > 0 ? `${stats.pending} ждут подтверждения` : "на этот день",
+            hint: `${stats.confirmed} подтв. · ${stats.completed} заверш. · ${stats.noShow} неявок`,
             icon: CalendarDays,
           },
           {
-            label: "Загрузка",
-            value: `${stats.load}%`,
-            hint: `${Math.round(stats.bookedMinutes / 60)} ч занято`,
+            label: "Свободные окна",
+            value: `${Math.round(stats.freeMinutes / 60)} ч`,
+            hint: `${stats.load}% загрузка (${Math.round(stats.bookedMinutes / 60)} ч занято)`,
             icon: Gauge,
           },
           {
             label: "Ожидаемая выручка",
             value: formatMoney(stats.revenue, business.currency),
-            hint: "по прайсу услуг",
+            hint: `Факт: ${formatMoney(stats.actualRevenue, business.currency)}`,
             icon: CircleDollarSign,
           },
           {
             label: "Мастеров",
             value: String(schedule.staff.length),
-            hint: schedule.staff.length ? "в расписании" : "добавьте команду",
+            hint: schedule.staff.length ? "в графике на день" : "добавьте команду",
             icon: CalendarDays,
           },
         ].map((card) => (
@@ -144,6 +159,17 @@ export default async function DashboardPage({
             <p className="mt-1.5 text-[11px] text-muted">{card.hint}</p>
           </div>
         ))}
+      </div>
+
+      {/* Status breakdown bar */}
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white p-3 ring-1 ring-line/80 text-[12px]">
+        <span className="text-[11px] font-medium text-muted uppercase tracking-wider px-1">Статусы:</span>
+        <span className="rounded-full bg-paper px-2.5 py-1 font-medium">Всего: {stats.totalBookings}</span>
+        <span className="rounded-full bg-brand/10 text-brand px-2.5 py-1 font-medium">Подтверждено: {stats.confirmed}</span>
+        <span className="rounded-full bg-mint/10 text-mint px-2.5 py-1 font-medium">Пришёл: {stats.completed}</span>
+        {stats.noShow > 0 && <span className="rounded-full bg-rose/10 text-rose px-2.5 py-1 font-medium">Не пришёл: {stats.noShow}</span>}
+        {stats.cancelled > 0 && <span className="rounded-full bg-paper text-muted px-2.5 py-1 font-medium">Отменено: {stats.cancelled}</span>}
+        {stats.pending > 0 && <span className="rounded-full bg-amber/10 text-amber px-2.5 py-1 font-medium">Ждёт подтверждения: {stats.pending}</span>}
       </div>
 
       <div className="rounded-[24px] bg-white p-4 ring-1 ring-line/80 sm:p-5">
@@ -164,6 +190,12 @@ export default async function DashboardPage({
             </span>
           </div>
         </div>
+
+        {stats.count === 0 && schedule.staff.length > 0 && (
+          <div className="mb-4 rounded-xl border border-dashed border-line bg-paper/50 p-3.5 text-center text-[12px] text-muted">
+            На этот день пока нет записей. Создайте запись вручную по кнопке «Новая запись» или отправьте ссылку на запись клиентам.
+          </div>
+        )}
 
         <DayTimeline
           staff={schedule.staff.map((s) => ({

@@ -79,6 +79,9 @@ export function DayTimeline({
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<TimelineBooking | null>(null);
+  const [showCancelled, setShowCancelled] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [showCancelPrompt, setShowCancelPrompt] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const allHours = Object.values(hours).flat();
@@ -95,12 +98,14 @@ export function DayTimeline({
     (_, i) => rangeStart + i * 60,
   );
 
-  function act(status: "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW") {
+  function act(status: "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW", reason?: string) {
     if (!selected) return;
     startTransition(async () => {
       const result = await setBookingStatus(selected.id, status);
       if (result.ok) {
         setSelected(null);
+        setShowCancelPrompt(false);
+        setCancelReason("");
         router.refresh();
       }
     });
@@ -120,8 +125,25 @@ export function DayTimeline({
     );
   }
 
+  const cancelledCount = bookings.filter((b) => b.status === "CANCELLED").length;
+  const visibleBookings = showCancelled ? bookings : bookings.filter((b) => b.status !== "CANCELLED");
+
   return (
     <div className="relative">
+      {cancelledCount > 0 && (
+        <div className="mb-3 flex justify-end">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-[11.5px] text-muted hover:text-ink">
+            <input
+              type="checkbox"
+              checked={showCancelled}
+              onChange={(e) => setShowCancelled(e.target.checked)}
+              className="size-3.5 rounded border-line accent-brand"
+            />
+            Показать отменённые ({cancelledCount})
+          </label>
+        </div>
+      )}
+
       <div className="overflow-x-auto pb-1">
         <div className="flex min-w-max gap-2">
           <div className="w-11 shrink-0 pt-[46px]">
@@ -140,7 +162,7 @@ export function DayTimeline({
 
           {staff.map((member) => {
             const memberHours = hours[member.id] ?? [];
-            const memberBookings = bookings.filter((b) => b.staffId === member.id);
+            const memberBookings = visibleBookings.filter((b) => b.staffId === member.id);
             return (
               <div key={member.id} className="min-w-[168px] flex-1">
                 <div className="mb-2 flex h-[38px] items-center gap-2 rounded-xl bg-white px-2.5 ring-1 ring-line">
@@ -187,35 +209,76 @@ export function DayTimeline({
                     const endMin = minutesInZone(booking.endAt, timezone);
                     const top = ((startMin - rangeStart) / 60) * hourHeight;
                     const height = Math.max(30, ((endMin - startMin) / 60) * hourHeight - 2);
-                    const background =
-                      booking.status === "PENDING"
-                        ? "#f5a52414"
-                        : booking.status === "COMPLETED"
-                          ? "#12b88614"
-                          : `${booking.staffColor}16`;
-                    const border =
-                      booking.status === "PENDING"
-                        ? "#f5a524"
-                        : booking.status === "COMPLETED"
-                          ? "#12b886"
-                          : booking.staffColor;
+
+                    const isBlock = booking.note?.startsWith("[БЛОКИРОВКА]");
+                    const nowMs = Date.now();
+                    const bookingStartMs = new Date(booking.startAt).getTime();
+                    const bookingEndMs = new Date(booking.endAt).getTime();
+                    const isLate =
+                      !isBlock &&
+                      booking.status === "CONFIRMED" &&
+                      nowMs - bookingStartMs > 10 * 60_000 &&
+                      nowMs < bookingEndMs + 60 * 60_000;
+                    const lateMins = isLate ? Math.floor((nowMs - bookingStartMs) / 60_000) : 0;
+
+                    let background = `${booking.staffColor}16`;
+                    let border = booking.staffColor;
+                    let opacity = 1;
+
+                    if (isBlock) {
+                      background = "#6b728014";
+                      border = "#6b7280";
+                    } else if (booking.status === "PENDING") {
+                      background = "#f5a52414";
+                      border = "#f5a524";
+                    } else if (booking.status === "COMPLETED") {
+                      background = "#12b88614";
+                      border = "#12b886";
+                    } else if (booking.status === "NO_SHOW") {
+                      background = "#f43f5e14";
+                      border = "#f43f5e";
+                    } else if (booking.status === "CANCELLED") {
+                      background = "#9ca3af12";
+                      border = "#9ca3af";
+                      opacity = 0.55;
+                    }
+
                     return (
                       <button
                         key={booking.id}
-                        onClick={() => setSelected(booking)}
-                        className="absolute right-1 left-1 overflow-hidden rounded-lg px-2 py-1.5 text-left transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:z-10 hover:scale-[1.02] hover:shadow-soft"
+                        onClick={() => {
+                          setSelected(booking);
+                          setShowCancelPrompt(false);
+                          setCancelReason("");
+                        }}
+                        className={`absolute right-1 left-1 overflow-hidden rounded-lg px-2 py-1.5 text-left transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:z-10 hover:scale-[1.02] hover:shadow-soft ${
+                          booking.status === "CANCELLED" ? "line-through opacity-60" : ""
+                        }`}
                         style={{
                           top,
                           height,
                           background,
                           borderLeft: `3px solid ${border}`,
+                          opacity,
                         }}
                       >
-                        <p className="text-[10.5px] font-semibold tabular-nums">
-                          {timeInZone(booking.startAt, timezone)}
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10.5px] font-semibold tabular-nums">
+                            {timeInZone(booking.startAt, timezone)}
+                          </p>
+                          {isLate && (
+                            <span className="rounded bg-amber px-1 py-0.2 text-[9px] font-bold text-white">
+                              +{lateMins}м
+                            </span>
+                          )}
+                          {isBlock && <span className="text-[10px]">🔒</span>}
+                        </div>
+                        <p className="truncate text-[11px] font-medium">
+                          {isBlock ? booking.note?.replace("[БЛОКИРОВКА]", "").trim() || "Перерыв" : booking.clientName}
                         </p>
-                        <p className="truncate text-[11px] font-medium">{booking.clientName}</p>
-                        <p className="truncate text-[10px] text-muted">{booking.serviceName}</p>
+                        <p className="truncate text-[10px] text-muted">
+                          {isBlock ? "Недоступно для записи" : booking.serviceName}
+                        </p>
                       </button>
                     );
                   })}
@@ -235,7 +298,9 @@ export function DayTimeline({
           />
           <div className="relative z-10 flex h-full w-full max-w-[380px] flex-col overflow-y-auto bg-white shadow-lift animate-rise">
             <div className="flex items-center justify-between border-b border-line px-5 py-4">
-              <p className="text-[13px] font-semibold">Запись</p>
+              <p className="text-[13px] font-semibold">
+                {selected.note?.startsWith("[БЛОКИРОВКА]") ? "Блокировка времени" : "Запись"}
+              </p>
               <button
                 onClick={() => setSelected(null)}
                 className="grid size-8 place-items-center rounded-lg bg-paper text-muted hover:text-ink"
@@ -253,20 +318,38 @@ export function DayTimeline({
                       ? "bg-amber/10 text-amber"
                       : selected.status === "COMPLETED"
                         ? "bg-mint/10 text-mint"
-                        : ""
+                        : selected.status === "NO_SHOW"
+                          ? "bg-rose/10 text-rose"
+                          : selected.status === "CANCELLED"
+                            ? "bg-paper text-muted"
+                            : ""
                   }`}
                 >
                   {STATUS_LABEL[selected.status] ?? selected.status}
                 </span>
+
+                {selected.status === "CONFIRMED" &&
+                  Date.now() - new Date(selected.startAt).getTime() > 10 * 60_000 &&
+                  Date.now() < new Date(selected.endAt).getTime() + 60 * 60_000 &&
+                  !selected.note?.startsWith("[БЛОКИРОВКА]") && (
+                    <div className="mt-2.5 flex items-center gap-1.5 rounded-lg border border-amber/25 bg-amber/10 px-2.5 py-1.5 text-[11.5px] font-medium text-amber">
+                      <span>⚠️ Клиент опаздывает на {Math.floor((Date.now() - new Date(selected.startAt).getTime()) / 60_000)} мин</span>
+                    </div>
+                  )}
+
                 <p className="mt-3 text-[22px] leading-tight font-semibold">
-                  {selected.clientName}
+                  {selected.note?.startsWith("[БЛОКИРОВКА]")
+                    ? selected.note.replace("[БЛОКИРОВКА]", "").trim() || "Перерыв"
+                    : selected.clientName}
                 </p>
-                <a
-                  href={`tel:${selected.clientPhone}`}
-                  className="mt-1 inline-flex items-center gap-1.5 text-[12.5px] text-muted hover:text-ink"
-                >
-                  <Phone size={13} strokeWidth={1.6} /> {selected.clientPhone}
-                </a>
+                {selected.clientPhone !== "-" && (
+                  <a
+                    href={`tel:${selected.clientPhone}`}
+                    className="mt-1 inline-flex items-center gap-1.5 text-[12.5px] text-muted hover:text-ink"
+                  >
+                    <Phone size={13} strokeWidth={1.6} /> {selected.clientPhone}
+                  </a>
+                )}
               </div>
 
               <div className="space-y-2.5 rounded-2xl bg-paper p-4 ring-1 ring-line/70">
@@ -291,10 +374,12 @@ export function DayTimeline({
                   </span>
                   <span>{selected.staffName}</span>
                 </div>
-                <div className="flex items-center justify-between border-t border-line pt-2.5 text-[12.5px]">
-                  <span className="text-muted">Стоимость</span>
-                  <span className="font-semibold">{formatMoney(selected.price, currency)}</span>
-                </div>
+                {!selected.note?.startsWith("[БЛОКИРОВКА]") && (
+                  <div className="flex items-center justify-between border-t border-line pt-2.5 text-[12.5px]">
+                    <span className="text-muted">Стоимость</span>
+                    <span className="font-semibold">{formatMoney(selected.price, currency)}</span>
+                  </div>
+                )}
                 {selected.note && (
                   <p className="border-t border-line pt-2.5 text-[12px] leading-relaxed text-muted">
                     «{selected.note}»
@@ -302,54 +387,101 @@ export function DayTimeline({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                {selected.status === "PENDING" && (
+              {selected.note?.startsWith("[БЛОКИРОВКА]") ? (
+                <div>
                   <button
-                    onClick={() => act("CONFIRMED")}
+                    onClick={() => act("CANCELLED")}
                     disabled={pending}
-                    className="btn btn-primary col-span-2 h-11"
+                    className="btn btn-secondary h-11 w-full text-[13px] text-rose hover:bg-rose/5"
                   >
-                    {pending ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-                    Подтвердить
+                    {pending ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />}
+                    Снять блокировку времени
                   </button>
-                )}
-                {selected.status === "CONFIRMED" && (
-                  <button
-                    onClick={() => act("COMPLETED")}
-                    disabled={pending}
-                    className="btn btn-primary col-span-2 h-11"
-                  >
-                    {pending ? <Loader2 size={15} className="animate-spin" /> : <BadgeCheck size={15} />}
-                    Отметить «пришёл»
-                  </button>
-                )}
-                {selected.status === "CONFIRMED" && (
-                  <button
-                    onClick={() => act("NO_SHOW")}
-                    disabled={pending}
-                    className="btn btn-ghost h-10 text-[12.5px]"
-                  >
-                    <UserX size={14} /> Не пришёл
-                  </button>
-                )}
-                <button
-                  onClick={() => act("CANCELLED")}
-                  disabled={pending || selected.status === "CANCELLED"}
-                  className={`btn btn-ghost h-10 text-[12.5px] text-rose hover:border-rose/30 hover:bg-rose/5 ${
-                    selected.status === "CONFIRMED" ? "" : "col-span-2"
-                  }`}
-                >
-                  <X size={14} /> Отменить
-                </button>
-              </div>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-2 gap-2">
+                    {selected.status === "PENDING" && (
+                      <button
+                        onClick={() => act("CONFIRMED")}
+                        disabled={pending}
+                        className="btn btn-primary col-span-2 h-11"
+                      >
+                        {pending ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                        Подтвердить
+                      </button>
+                    )}
+                    {selected.status === "CONFIRMED" && (
+                      <button
+                        onClick={() => act("COMPLETED")}
+                        disabled={pending}
+                        className="btn btn-primary col-span-2 h-11"
+                      >
+                        {pending ? <Loader2 size={15} className="animate-spin" /> : <BadgeCheck size={15} />}
+                        Отметить «пришёл»
+                      </button>
+                    )}
+                    {selected.status === "CONFIRMED" && (
+                      <button
+                        onClick={() => act("NO_SHOW")}
+                        disabled={pending}
+                        className="btn btn-ghost h-10 text-[12.5px]"
+                      >
+                        <UserX size={14} /> Не пришёл
+                      </button>
+                    )}
+                    {selected.status !== "CANCELLED" && (
+                      <button
+                        onClick={() => setShowCancelPrompt(true)}
+                        disabled={pending}
+                        className={`btn btn-ghost h-10 text-[12.5px] text-rose hover:border-rose/30 hover:bg-rose/5 ${
+                          selected.status === "CONFIRMED" ? "" : "col-span-2"
+                        }`}
+                      >
+                        <X size={14} /> Отменить
+                      </button>
+                    )}
+                  </div>
 
-              <Link
-                href={`/b/${selected.manageToken}`}
-                target="_blank"
-                className="inline-flex items-center gap-1.5 text-[12px] text-muted underline underline-offset-4 hover:text-ink"
-              >
-                Ссылка для клиента <ExternalLink size={12} />
-              </Link>
+                  {showCancelPrompt && (
+                    <div className="rounded-xl border border-rose/20 bg-rose/5 p-3">
+                      <p className="text-[12px] font-medium text-rose">Укажите причину отмены:</p>
+                      <input
+                        type="text"
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        placeholder="Клиент попросил отменить, мастер заболел..."
+                        className="input-base mt-2 text-[12px]"
+                      />
+                      <div className="mt-2.5 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowCancelPrompt(false)}
+                          className="btn btn-ghost h-8 text-[11px]"
+                        >
+                          Назад
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => act("CANCELLED", cancelReason)}
+                          className="btn btn-primary h-8 bg-rose text-[11px] hover:bg-rose/90"
+                        >
+                          {pending ? <Loader2 size={12} className="animate-spin" /> : "Подтвердить отмену"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <Link
+                    href={`/b/${selected.manageToken}`}
+                    target="_blank"
+                    className="inline-flex items-center gap-1.5 text-[12px] text-muted underline underline-offset-4 hover:text-ink"
+                  >
+                    Ссылка для клиента <ExternalLink size={12} />
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>

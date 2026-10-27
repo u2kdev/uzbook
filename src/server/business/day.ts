@@ -63,7 +63,6 @@ export async function getDaySchedule(business: Business, date: string) {
       .where(
         and(
           eq(bookings.businessId, business.id),
-          ne(bookings.status, "CANCELLED"),
           gte(bookings.startAt, dayStart),
           lt(bookings.startAt, dayEnd),
         ),
@@ -99,9 +98,27 @@ export async function getDaySchedule(business: Business, date: string) {
   return { staff: staffRows, bookings: dayBookings, hoursByStaff, weekday };
 }
 
-export function dayStats(business: Business, schedule: Awaited<ReturnType<typeof getDaySchedule>>) {
-  const active = schedule.bookings.filter((b) => b.status !== "CANCELLED");
-  const revenue = active.reduce((sum, b) => sum + b.price, 0);
+export function dayStats(
+  business: Business,
+  schedule: Awaited<ReturnType<typeof getDaySchedule>>,
+  now = new Date(),
+) {
+  const all = schedule.bookings;
+  const active = all.filter((b) => b.status !== "CANCELLED");
+  const confirmed = all.filter((b) => b.status === "CONFIRMED");
+  const completed = all.filter((b) => b.status === "COMPLETED");
+  const noShow = all.filter((b) => b.status === "NO_SHOW");
+  const cancelled = all.filter((b) => b.status === "CANCELLED");
+  const pending = all.filter((b) => b.status === "PENDING");
+
+  // Late arrivals: confirmed bookings whose start time passed over 10 minutes ago
+  const nowMs = now.getTime();
+  const late = confirmed.filter(
+    (b) => nowMs - b.startAt.getTime() > 10 * 60_000 && nowMs < b.endAt.getTime() + 60 * 60_000,
+  );
+
+  const expectedRevenue = active.reduce((sum, b) => sum + b.price, 0);
+  const actualRevenue = completed.reduce((sum, b) => sum + b.price, 0);
   const bookedMinutes = active.reduce((sum, b) => sum + b.durationMin, 0);
 
   let workingMinutes = 0;
@@ -110,11 +127,24 @@ export function dayStats(business: Business, schedule: Awaited<ReturnType<typeof
     for (const h of hours) workingMinutes += Math.max(0, h.endMinute - h.startMinute);
   }
 
+  const freeMinutes = Math.max(0, workingMinutes - bookedMinutes);
+  const load =
+    workingMinutes > 0 ? Math.min(100, Math.round((bookedMinutes / workingMinutes) * 100)) : 0;
+
   return {
     count: active.length,
-    revenue,
+    totalBookings: all.length,
+    confirmed: confirmed.length,
+    completed: completed.length,
+    noShow: noShow.length,
+    cancelled: cancelled.length,
+    pending: pending.length,
+    late: late.length,
+    revenue: expectedRevenue,
+    actualRevenue,
     bookedMinutes,
-    load: workingMinutes > 0 ? Math.min(100, Math.round((bookedMinutes / workingMinutes) * 100)) : 0,
-    pending: active.filter((b) => b.status === "PENDING").length,
+    freeMinutes,
+    workingMinutes,
+    load,
   };
 }
