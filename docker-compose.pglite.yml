@@ -1,0 +1,28 @@
+# Single-container install for a small server.
+# Uses embedded PGlite; data and uploads live in the app_data volume.
+# PGlite allows only one process, so a separate Telegram bot does not work:
+# use docker-compose.yml with PostgreSQL if you need the bot container.
+services:
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: ""
+      # Production default: never enable free test payments by accident.
+      PAYMENTS_DEMO: "off"
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - app_data:/app/.data
+
+volumes:
+  app_data:

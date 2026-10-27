@@ -1,0 +1,66 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-uzbook}
+      POSTGRES_USER: ${POSTGRES_USER:-uzbook}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-uzbook}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-uzbook}"
+      RUN_MIGRATIONS_ON_START: "true"
+      # Production default: never enable free test payments by accident.
+      # For a staging demo, temporarily change to "on".
+      PAYMENTS_DEMO: "off"
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - uploads:/app/.data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Optional: docker compose --profile bot up -d --build bot
+  # Requires TELEGRAM_BOT_TOKEN in .env and PostgreSQL (not the PGlite file).
+  bot:
+    profiles: ["bot"]
+    build:
+      context: .
+      target: bot
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-uzbook}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-uzbook}"
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        # Wait for the app to apply migrations before the bot starts.
+        condition: service_healthy
+
+volumes:
+  pg_data:
+  uploads:

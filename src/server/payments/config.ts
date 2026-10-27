@@ -1,0 +1,168 @@
+import type { Plan } from "@/lib/plans";
+
+export type PaymentProviderId = "PAYME" | "CLICK" | "TELEGRAM_STARS" | "DEMO" | "MANUAL";
+
+export type ProviderOption = {
+  id: PaymentProviderId;
+  label: string;
+  hint: string;
+  test?: boolean;
+};
+
+export function appUrl(): string {
+  return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+}
+
+export function paymeConfig() {
+  const merchantId = process.env.PAYME_MERCHANT_ID?.trim() ?? "";
+  const key = process.env.PAYME_KEY?.trim() ?? "";
+  return {
+    merchantId,
+    key,
+    enabled: Boolean(merchantId && key),
+  };
+}
+
+export function clickConfig() {
+  const serviceId = process.env.CLICK_SERVICE_ID?.trim() ?? "";
+  const merchantId = process.env.CLICK_MERCHANT_ID?.trim() ?? "";
+  const secretKey = process.env.CLICK_SECRET_KEY?.trim() ?? "";
+  return {
+    serviceId,
+    merchantId,
+    secretKey,
+    enabled: Boolean(serviceId && merchantId && secretKey),
+  };
+}
+
+export function telegramPaymentsEnabled(): boolean {
+  return Boolean(
+    process.env.TELEGRAM_BOT_TOKEN?.trim() && process.env.TELEGRAM_BOT_USERNAME?.trim(),
+  );
+}
+
+/**
+ * Test payments activate a plan for free. They are enabled automatically in
+ * development and can be switched on explicitly with PAYMENTS_DEMO=on.
+ * In production set PAYMENTS_DEMO=off once real acquiring is connected.
+ */
+export function demoPaymentsEnabled(): boolean {
+  const flag = process.env.PAYMENTS_DEMO?.trim().toLowerCase();
+  if (["off", "false", "0", "no"].includes(flag ?? "")) return false;
+  if (["on", "true", "1", "yes"].includes(flag ?? "")) return true;
+  return process.env.NODE_ENV !== "production";
+}
+
+export function availableProviders(): ProviderOption[] {
+  const providers: ProviderOption[] = [];
+
+  if (paymeConfig().enabled) {
+    providers.push({
+      id: "PAYME",
+      label: "Payme",
+      hint: "Карта Uzcard / Humo, оплата на защищённой странице Payme",
+    });
+  }
+  if (clickConfig().enabled) {
+    providers.push({
+      id: "CLICK",
+      label: "Click",
+      hint: "Оплата картой или через приложение Click",
+    });
+  }
+  if (telegramPaymentsEnabled()) {
+    providers.push({
+      id: "TELEGRAM_STARS",
+      label: "Telegram Stars",
+      hint: "Оплата звёздами внутри Telegram — без карты",
+    });
+  }
+  if (demoPaymentsEnabled()) {
+    providers.push({
+      id: "DEMO",
+      label: "Тестовый платёж",
+      hint: "Мгновенно включает тариф. Реальные деньги не списываются",
+      test: true,
+    });
+  }
+  providers.push({
+    id: "MANUAL",
+    label: "Перевод вручную",
+    hint: "Переведите сумму и пришлите чек — админ подтвердит вручную",
+  });
+
+  return providers;
+}
+
+export function providerLabel(provider: string): string {
+  return {
+    PAYME: "Payme",
+    CLICK: "Click",
+    TELEGRAM_STARS: "Telegram Stars",
+    DEMO: "Тестовый платёж",
+    MANUAL: "Перевод вручную",
+    CRYPTO: "Криптовалюта",
+    STRIPE: "Stripe",
+  }[provider] ?? provider;
+}
+
+/** Payme checkout expects the amount in tiyin (1 UZS = 100 tiyin). */
+export function buildPaymeCheckoutUrl(plan: Plan, externalId: string): string | null {
+  const { merchantId, enabled } = paymeConfig();
+  if (!enabled) return null;
+
+  const params = [
+    `m=${merchantId}`,
+    `ac.order_id=${externalId}`,
+    `a=${plan.priceUzs * 100}`,
+    `c=${appUrl()}/pay/${externalId}`,
+    "l=ru",
+  ].join(";");
+
+  return `https://checkout.paycom.uz/${Buffer.from(params).toString("base64")}`;
+}
+
+export function buildClickCheckoutUrl(plan: Plan, externalId: string): string | null {
+  const { serviceId, merchantId, enabled } = clickConfig();
+  if (!enabled) return null;
+
+  const url = new URL("https://my.click.uz/services/pay");
+  url.searchParams.set("service_id", serviceId);
+  url.searchParams.set("merchant_id", merchantId);
+  url.searchParams.set("amount", String(plan.priceUzs));
+  url.searchParams.set("transaction_param", externalId);
+  url.searchParams.set("return_url", `${appUrl()}/pay/${externalId}`);
+  return url.toString();
+}
+
+export async function createTelegramInvoice(params: {
+  plan: Plan;
+  externalId: string;
+  businessName: string;
+}): Promise<string | null> {
+  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!token || !telegramPaymentsEnabled()) return null;
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/createInvoiceLink`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      title: `Тариф «${params.plan.name}» — 30 дней`,
+      description: `${params.businessName}: страница записи, мастера, услуги и уведомления.`,
+      payload: params.externalId,
+      provider_token: "",
+      currency: "XTR",
+      prices: [{ label: `Тариф «${params.plan.name}», 30 дней`, amount: params.plan.starsPrice }],
+    }),
+  });
+
+  const data = (await response.json().catch(() => null)) as
+    | { ok?: boolean; result?: string; description?: string }
+    | null;
+
+  if (!data?.ok || !data.result) {
+    console.error("Telegram createInvoiceLink failed", data?.description);
+    return null;
+  }
+  return data.result;
+}
