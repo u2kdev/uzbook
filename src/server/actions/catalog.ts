@@ -6,7 +6,7 @@ import { z } from "zod";
 import { getDb } from "@/server/db";
 import { businesses, services, staff, staffServices, workingHours } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
-import { serviceLimitError, staffLimitError } from "@/server/limits";
+import { serviceLimitError, staffLimitError, writeBlockedReason } from "@/server/limits";
 
 export type ActionState = { ok?: boolean; error?: string; field?: string } | null;
 
@@ -85,6 +85,9 @@ export async function updateServiceAction(
   const { business, db } = await myBusiness();
   if (!business) return { error: "Сначала создайте бизнес" };
 
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
   const id = String(formData.get("id") ?? "");
   if (!id) return { error: "Услуга не найдена" };
 
@@ -104,6 +107,10 @@ export async function updateServiceAction(
 export async function deleteServiceAction(id: string): Promise<ActionState> {
   const { business, db } = await myBusiness();
   if (!business) return { error: "Сначала создайте бизнес" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
   try {
     await db
       .delete(services)
@@ -118,6 +125,10 @@ export async function deleteServiceAction(id: string): Promise<ActionState> {
 export async function toggleServiceAction(id: string, isActive: boolean): Promise<ActionState> {
   const { business, db } = await myBusiness();
   if (!business) return { error: "Нет доступа" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
   await db
     .update(services)
     .set({ isActive })
@@ -181,6 +192,9 @@ export async function updateStaffAction(
   const { business, db } = await myBusiness();
   if (!business) return { error: "Сначала создайте бизнес" };
 
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   if (!id || name.length < 2) return { error: "Проверьте имя мастера" };
@@ -221,6 +235,10 @@ export async function updateStaffAction(
 export async function deleteStaffAction(id: string): Promise<ActionState> {
   const { business, db } = await myBusiness();
   if (!business) return { error: "Нет доступа" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
   await db.delete(staff).where(and(eq(staff.id, id), eq(staff.businessId, business.id)));
   revalidatePath("/dashboard/staff");
   return { ok: true };
@@ -240,6 +258,9 @@ export async function saveScheduleAction(
 ): Promise<ActionState> {
   const { business, db } = await myBusiness();
   if (!business) return { error: "Нет доступа" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
 
   const [member] = await db
     .select()
@@ -283,6 +304,10 @@ export async function bulkAssignServicesAction(
 ): Promise<ActionState> {
   const { business, db } = await myBusiness();
   if (!business) return { error: "Нет доступа" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
   const [member] = await db
     .select()
     .from(staff)

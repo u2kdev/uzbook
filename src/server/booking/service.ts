@@ -19,6 +19,7 @@ import {
   notifyBookingRescheduled,
   notifyNewBooking,
 } from "@/server/telegram/notify";
+import { logger } from "@/server/logger";
 
 export type BookingFailure =
   | "business_not_found"
@@ -166,13 +167,27 @@ export async function createBooking(input: {
     });
 
     if (!created) return { ok: false, error: "slot_unavailable" };
+
+    logger.info("booking.created", {
+      bookingId: created.id,
+      businessId: input.business.id,
+      serviceId: service.id,
+      staffId: member.id,
+      startAt: start.toISOString(),
+      source: input.source ?? "WEB",
+    });
+
     void notifyNewBooking(created.id);
     return {
       ok: true,
       data: { id: created.id, manageToken, startAt: start, endAt: end },
     };
   } catch (error) {
-    console.error("createBooking failed", error);
+    logger.error("booking.create_failed", error, {
+      businessId: input.business.id,
+      serviceId: input.serviceId,
+      staffId: input.staffId,
+    });
     return { ok: false, error: "slot_unavailable" };
   }
 }
@@ -275,6 +290,12 @@ export async function cancelBooking(
     })
     .where(eq(bookings.id, booking.id));
 
+  logger.info("booking.cancelled", {
+    bookingId: booking.id,
+    businessId: booking.businessId,
+    reason: reason ?? null,
+  });
+
   void notifyBookingCancelled(booking.id);
   return { ok: true, data: { id: booking.id } };
 }
@@ -359,6 +380,13 @@ export async function rescheduleBooking(
   });
 
   if (!moved) return { ok: false, error: "slot_unavailable" };
+
+  logger.info("booking.rescheduled", {
+    bookingId: booking.id,
+    businessId: booking.businessId,
+    newStartAt: start.toISOString(),
+  });
+
   void notifyBookingRescheduled(booking.id);
   return { ok: true, data: { startAt: start, endAt: end } };
 }

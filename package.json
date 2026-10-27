@@ -13,6 +13,8 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed.ts",
     "db:sync": "tsx scripts/sync-migrations.ts",
+    "admin:create": "tsx scripts/create-admin.ts",
+    "maintenance": "tsx scripts/maintenance.ts",
     "bot": "tsx bot/index.ts",
     "typecheck": "tsc --noEmit"
   },

@@ -14,6 +14,7 @@ import {
   verifyPassword,
 } from "@/server/auth/session";
 import { isValidSlug, slugify } from "@/lib/slug";
+import { logger } from "@/server/logger";
 
 export type AuthState = { error?: string } | null;
 
@@ -51,6 +52,8 @@ export async function registerAction(_prev: AuthState, formData: FormData): Prom
     })
     .returning();
 
+  logger.info("auth.register", { userId: user.id, email: user.email, role: user.role });
+
   await setSessionCookie(user);
   redirect("/onboarding");
 }
@@ -68,16 +71,28 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
     .from(users)
     .where(eq(users.email, parsed.data.email))
     .limit(1);
-  if (!user) return { error: "Не нашли аккаунт с таким email." };
+  if (!user) {
+    logger.warn("auth.login_failed", { email: parsed.data.email, reason: "user_not_found" });
+    return { error: "Не нашли аккаунт с таким email." };
+  }
 
   const valid = await verifyPassword(parsed.data.password, user.passwordHash);
-  if (!valid) return { error: "Неверный пароль." };
+  if (!valid) {
+    logger.warn("auth.login_failed", { email: user.email, userId: user.id, reason: "invalid_password" });
+    return { error: "Неверный пароль." };
+  }
+
+  logger.info("auth.login_success", { userId: user.id, email: user.email, role: user.role });
 
   await setSessionCookie(user);
   redirect(user.role === "OWNER" ? "/dashboard" : "/admin");
 }
 
 export async function logoutAction() {
+  const session = await getSession();
+  if (session) {
+    logger.info("auth.logout", { userId: session.id, email: session.email });
+  }
   await clearSessionCookie();
   redirect("/");
 }

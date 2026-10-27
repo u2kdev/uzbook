@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
+import { authSecret } from "@/server/config/env";
 
 const COOKIE_NAME = "uz_session";
 const MAX_AGE = 60 * 60 * 24 * 30;
@@ -11,8 +12,7 @@ export type SessionUser = {
 };
 
 function secret() {
-  const value = process.env.AUTH_SECRET ?? "dev-only-secret-change-me-please-32chars-min";
-  return new TextEncoder().encode(value);
+  return new TextEncoder().encode(authSecret());
 }
 
 export async function signSession(user: SessionUser): Promise<string> {

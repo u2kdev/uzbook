@@ -37,9 +37,7 @@ export default async function BillingPage() {
   const providers = availableProviders();
   const usage = await getUsage(business);
   const subscription = await getSubscriptionInfo(business);
-  const payDetails =
-    process.env.PAYMENT_DETAILS ??
-    "Перевод на карту: 8600 0000 0000 0000 (Uzcard) · Получатель: UZBOOK";
+  const payDetails = process.env.PAYMENT_DETAILS?.trim() ?? "";
   const supportTelegram = process.env.SUPPORT_TELEGRAM ?? "@uzbook_support";
   const trialDaysLeft = subscription.trialDaysLeft;
   const storageLimitBytes = current.storageMb * MB;
@@ -170,7 +168,11 @@ export default async function BillingPage() {
         </div>
         <div className="mt-4 rounded-xl bg-paper/80 px-3.5 py-3 text-[11.5px] leading-relaxed text-muted">
           <p className="font-medium text-ink-soft">Если удобнее переводом</p>
-          <p className="mt-1">{payDetails}</p>
+          {payDetails ? (
+            <p className="mt-1">{payDetails}</p>
+          ) : (
+            <p className="mt-1">Реквизиты для перевода уточните у поддержки.</p>
+          )}
           <p className="mt-1">
             После перевода напишите в поддержку {supportTelegram} и приложите чек. Заявку
             подтвердит администратор — тариф включится на 30 дней.

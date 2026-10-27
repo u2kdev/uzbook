@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { clientIp, isIpAllowed, rateLimit } from "@/server/http/rate-limit";
 import { clickConfig } from "@/server/payments/config";
 import {
   completePayment,
@@ -52,6 +53,24 @@ export async function POST(request: Request) {
   const config = clickConfig();
   if (!config.enabled) {
     return reply({ error: -1, error_note: "Click не настроен" });
+  }
+
+  const ip = clientIp(request);
+  if (!isIpAllowed(ip, process.env.CLICK_IP_ALLOWLIST)) {
+    return Response.json({ error: -1, error_note: "IP not allowed" }, { status: 403 });
+  }
+
+  const limit = rateLimit(`click:${ip}`, 120, 60_000);
+  if (!limit.ok) {
+    return Response.json(
+      { error: -1, error_note: "Too many requests" },
+      {
+        status: 429,
+        headers: {
+          "retry-after": String(Math.max(1, Math.ceil((limit.resetAt - Date.now()) / 1000))),
+        },
+      },
+    );
   }
 
   let form: FormData;

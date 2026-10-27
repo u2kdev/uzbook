@@ -9,5 +9,6 @@ export default async function LoginPage() {
   // getCurrentUser verifies the user still exists, so a stale cookie can't trap us in onboarding.
   const user = await getCurrentUser();
   if (user) redirect(user.role === "OWNER" ? "/dashboard" : "/admin");
+
   return <AuthForm mode="login" />;
 }

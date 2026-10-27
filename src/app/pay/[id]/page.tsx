@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Clock3, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock3, XCircle } from "lucide-react";
 import { planById, formatMoney } from "@/lib/plans";
 import {
   demoPaymentsEnabled,
   providerLabel,
 } from "@/server/payments/config";
+import { isPaymentExpired } from "@/server/payments/expiry";
 import {
   getActiveSubscription,
   getPaymentByExternalId,
@@ -53,6 +54,7 @@ export default async function PaymentPage({
   const isFailed = payment.status === "FAILED";
   const isCancelled = payment.status === "CANCELLED";
   const pendingPayment = !isPaid && !isFailed && !isCancelled;
+  const expired = pendingPayment && isPaymentExpired(payment);
 
   return (
     <main className="min-h-screen bg-paper px-4 py-10 sm:py-16">
@@ -140,12 +142,24 @@ export default async function PaymentPage({
                   </Link>
                 </div>
               ) : pendingPayment ? (
-                <PaymentActions
-                  externalId={payment.externalId}
-                  provider={payment.provider}
-                  checkoutUrl={checkoutUrl}
-                  testMode={payment.provider === "DEMO" && demoPaymentsEnabled()}
-                />
+                <div className="space-y-3">
+                  {expired && (
+                    <div className="flex items-start gap-2.5 rounded-2xl border border-amber/25 bg-amber/5 px-4 py-3.5 text-[12px] leading-relaxed text-ink-soft">
+                      <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber" />
+                      <span>
+                        Счёт создан больше 30 минут назад. Если вы ещё не оплатили, создайте
+                        новый платёж в разделе «Оплата». Если оплата уже прошла — нажмите
+                        «Обновить статус» ниже.
+                      </span>
+                    </div>
+                  )}
+                  <PaymentActions
+                    externalId={payment.externalId}
+                    provider={payment.provider}
+                    checkoutUrl={checkoutUrl}
+                    testMode={payment.provider === "DEMO" && demoPaymentsEnabled()}
+                  />
+                </div>
               ) : (
                 <div className="space-y-4">
                   <div className="rounded-2xl bg-rose/5 px-4 py-3.5 text-[12.5px] leading-relaxed text-rose">

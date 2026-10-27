@@ -1,12 +1,14 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
-/** Convert a wall-clock time (business timezone) to a UTC instant. */
 export function zonedToUtc(date: string, minutesFromMidnight: number, timezone: string): Date {
-  const hours = Math.floor(minutesFromMidnight / 60);
-  const minutes = minutesFromMidnight % 60;
+  const extraDays = Math.floor(minutesFromMidnight / (24 * 60));
+  const remainingMinutes = ((minutesFromMidnight % (24 * 60)) + (24 * 60)) % (24 * 60);
+  const targetDate = extraDays !== 0 ? addDays(date, extraDays) : date;
+  const hours = Math.floor(remainingMinutes / 60);
+  const minutes = remainingMinutes % 60;
   const hh = String(hours).padStart(2, "0");
   const mm = String(minutes).padStart(2, "0");
-  return fromZonedTime(`${date}T${hh}:${mm}:00`, timezone);
+  return fromZonedTime(`${targetDate}T${hh}:${mm}:00`, timezone);
 }
 
 /** yyyy-MM-dd of an instant in the business timezone. */

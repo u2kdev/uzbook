@@ -4,38 +4,39 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { bookings, businesses } from "@/server/db/schema";
-import { getSession, requireUser } from "@/server/auth/session";
+import { requireUser } from "@/server/auth/session";
 import { createBooking } from "@/server/booking/service";
 
 export type StatusActionResult = { ok: boolean; error?: string };
-
-async function ownsBooking(bookingId: string) {
-  const session = await getSession();
-  if (!session) return false;
-  const db = await getDb();
-  const [row] = await db
-    .select({ id: bookings.id })
-    .from(bookings)
-    .innerJoin(businesses, eq(bookings.businessId, businesses.id))
-    .where(and(eq(bookings.id, bookingId), eq(businesses.ownerId, session.id)))
-    .limit(1);
-  return Boolean(row);
-}
 
 export async function setBookingStatus(
   bookingId: string,
   status: "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW",
 ): Promise<StatusActionResult> {
-  if (!(await ownsBooking(bookingId))) return { ok: false, error: "Нет доступа" };
+  const session = await requireUser();
+  if (session.role !== "OWNER") return { ok: false, error: "Нет доступа" };
+
   const db = await getDb();
-  await db
+  const [business] = await db
+    .select({ id: businesses.id })
+    .from(businesses)
+    .where(eq(businesses.ownerId, session.id))
+    .limit(1);
+
+  if (!business) return { ok: false, error: "Бизнес не найден" };
+
+  const updated = await db
     .update(bookings)
     .set({
       status,
       updatedAt: new Date(),
       ...(status === "CANCELLED" ? { cancelledAt: new Date(), cancelReason: "Отменено владельцем" } : {}),
     })
-    .where(eq(bookings.id, bookingId));
+    .where(and(eq(bookings.id, bookingId), eq(bookings.businessId, business.id)))
+    .returning({ id: bookings.id });
+
+  if (updated.length === 0) return { ok: false, error: "Запись не найдена или нет доступа" };
+
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/bookings");
   return { ok: true };

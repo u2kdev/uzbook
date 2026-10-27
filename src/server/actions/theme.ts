@@ -7,7 +7,7 @@ import { getDb } from "@/server/db";
 import { businesses } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { saveImage } from "@/server/storage";
-import { storageLimitError } from "@/server/limits";
+import { storageLimitError, writeBlockedReason } from "@/server/limits";
 
 export type ThemeState = { ok?: boolean; error?: string } | null;
 
@@ -70,6 +70,9 @@ export async function updateThemeAction(
 ): Promise<ThemeState> {
   const { business, db } = await ownerBusiness();
   if (!business) return { error: "Сначала создайте бизнес" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
 
   const parsed = themeSchema.safeParse({
     businessId: String(formData.get("businessId") ?? ""),

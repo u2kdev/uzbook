@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/server/db";
 import { payments } from "@/server/db/schema";
 import { planById } from "@/lib/plans";
+import { clientIp, isIpAllowed, rateLimit } from "@/server/http/rate-limit";
 import { paymeConfig } from "@/server/payments/config";
 import {
   cancelPayment,
@@ -93,7 +94,25 @@ async function findByOrder(orderId: string) {
 }
 
 export async function POST(request: Request) {
+  const ip = clientIp(request);
+  if (!isIpAllowed(ip, process.env.PAYME_IP_ALLOWLIST)) {
+    return fail(null, ERRORS.auth);
+  }
+
   if (!authorized(request)) return fail(null, ERRORS.auth);
+
+  const limit = rateLimit(`payme:${ip}`, 120, 60_000);
+  if (!limit.ok) {
+    return Response.json(
+      { jsonrpc: "2.0", id: null, error: { code: -32504, message: "Too many requests" } },
+      {
+        status: 429,
+        headers: {
+          "retry-after": String(Math.max(1, Math.ceil((limit.resetAt - Date.now()) / 1000))),
+        },
+      },
+    );
+  }
 
   let body: { id?: JsonRpcId; method?: string; params?: PaymeParams };
   try {

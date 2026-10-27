@@ -67,7 +67,8 @@ npm run dev            # http://localhost:3000
 
 Если миграция применялась вручную, синхронизируйте журнал: `npm run db:sync`.
 
-Демо-доступы:
+Демо-доступы (только локальная разработка; `npm run db:seed` отказывается
+работать при `NODE_ENV=production`):
 
 | Роль | Email | Пароль |
 | --- | --- | --- |
@@ -75,6 +76,14 @@ npm run dev            # http://localhost:3000
 | Админ | `admin@uzbook.online` | `admin1234` |
 | Поддержка | `support@uzbook.online` | `support1234` |
 | Владелец салона | `demo@uzbook.online` | `demo1234` |
+
+В production демо-пользователи не создаются. Первого администратора создайте
+из своих значений:
+
+```bash
+# в .env: ADMIN_EMAIL, ADMIN_PASSWORD (12+ символов), ADMIN_NAME
+npm run admin:create
+```
 
 Демо-страницы записи: http://localhost:3000/atelier-noir и http://localhost:3000/barber-house
 
@@ -111,6 +120,10 @@ npm run bot
 # Пусто → локальный PGlite в ./.data/pg
 DATABASE_URL=
 
+# ВНИМАНИЕ: PGlite работает в файловой системе и строго поддерживает только ОДИН процесс.
+# Нельзя подключать к одной директории PGlite несколько параллельных процессов (например, Next.js + бот или несколько реплик).
+# Для продакшена, бота и масштабирования обязательно используйте PostgreSQL через DATABASE_URL.
+
 # Docker compose: PostgreSQL и порт на хосте
 POSTGRES_DB=uzbook
 POSTGRES_USER=uzbook
@@ -137,7 +150,24 @@ PAYME_KEY=
 CLICK_SERVICE_ID=
 CLICK_MERCHANT_ID=
 CLICK_SECRET_KEY=
+
+# Реальные реквизиты для ручного перевода (пусто — показываем только поддержку)
+PAYMENT_DETAILS=
+SUPPORT_TELEGRAM=@uzbook_support
+
+# Показывать демо-доступы на /login (в production только для staging)
+SHOW_DEMO_ACCOUNTS=off
+
+# Первый администратор для `npm run admin:create`
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
+ADMIN_NAME=Администратор
 ```
+
+При старте production-сервера `src/instrumentation.ts` проверяет окружение:
+`AUTH_SECRET`, `APP_URL`, пароль PostgreSQL, целостность пар Payme/Click и
+отсутствие тестовой карты в `PAYMENT_DETAILS`. Ошибка останавливает контейнер,
+чтобы приложение не работало с dev-секретом или фейковыми реквизитами.
 
 ## Оплата и лимиты
 
@@ -207,6 +237,10 @@ cp .env.example .env
 docker compose up -d --build
 docker compose ps
 curl http://localhost:3000/api/health
+
+# первый администратор (использует ADMIN_EMAIL / ADMIN_PASSWORD из .env)
+docker compose run --rm --no-deps maintenance \
+  node ./node_modules/tsx/dist/cli.mjs scripts/create-admin.ts
 ```
 
 Что делает compose:
@@ -214,6 +248,8 @@ curl http://localhost:3000/api/health
 - `db` — PostgreSQL 17, данные в volume `pg_data`;
 - `app` — Next.js standalone в непривилегированном контейнере, миграции
   применяются при старте (`RUN_MIGRATIONS_ON_START=true`);
+- `maintenance` — раз в час закрывает истёкшие подписки и отменяет брошенные
+  платежи старше 24 часов (тот же образ, что у бота, поэтому есть `tsx`);
 - загруженные картинки — в volume `uploads` (`/app/.data/uploads`);
 - healthcheck — `GET /api/health` (проверяет и БД).
 
@@ -226,18 +262,16 @@ curl http://localhost:3000/api/health
 `.env` не включил бесплатные тестовые оплаты в production. Для тестового
 стенда поменяйте значение в compose на `on`.
 
-Поставьте HTTPS-прокси (nginx/Caddy) перед портом приложения. Для nginx
-увеличьте лимит тела запроса до 12 МБ, чтобы проходили загрузки галереи:
-
-```nginx
-client_max_body_size 12m;
-proxy_set_header Host $host;
-proxy_set_header X-Forwarded-Proto $scheme;
-proxy_pass http://127.0.0.1:3000;
-```
+Поставьте HTTPS-прокси (nginx/Caddy) перед портом приложения. Compose публикует
+порт только на `127.0.0.1`, поэтому снаружи должен быть только прокси. Готовый
+пример с лимитом тела 12 МБ, редиректом на HTTPS и rate limit для webhook:
+[`deploy/nginx.conf`](./deploy/nginx.conf).
 
 `APP_URL` должен совпадать с публичным HTTPS-адресом: от него зависят QR-коды,
 ссылки в Telegram и возврат после оплаты.
+
+CI (`.github/workflows/ci.yml`) запускает `typecheck`, `build` и
+`npm audit --omit=dev` на каждый push в `main` и pull request.
 
 Сборка образа требует интернет: `npm ci` скачивает зависимости, а
 `next/font/google` — шрифты. Если у сервера нет выхода наружу, соберите образ
@@ -272,20 +306,15 @@ PGlite и загрузки лежат в volume `app_data`. Это один пр
 ### Обновление и бэкапы
 
 ```bash
-# обновление
-docker compose build --pull
-docker compose up -d
+# обновление + healthcheck
+./deploy/deploy.sh
 
 # если подключён бот
 docker compose --profile bot build --pull
 docker compose --profile bot up -d
 
-# PostgreSQL
-docker compose exec db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' \
-  > backup-$(date +%F).sql
-
-# загруженные картинки
-docker compose cp app:/app/.data/uploads ./uploads-backup
+# PostgreSQL + uploads в ./backups/<timestamp>
+./deploy/backup.sh
 
 # PGlite: сначала остановить приложение, потом скопировать volume.
 # Имя volume смотрите в `docker volume ls` (обычно <проект>_app_data).

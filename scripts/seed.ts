@@ -1,6 +1,19 @@
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { getDb } from "../src/server/db";
+
+try {
+  process.loadEnvFile?.(".env");
+} catch {
+  /* .env is optional */
+}
+
+if (process.env.NODE_ENV === "production") {
+  console.error(
+    "Demo seed is disabled in production. Create the first administrator with ADMIN_EMAIL / ADMIN_PASSWORD and `npm run admin:create`.",
+  );
+  process.exit(1);
+}
 import {
   bookings,
   businesses,

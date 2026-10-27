@@ -6,7 +6,7 @@ import { getDb } from "@/server/db";
 import { businesses, galleryImages, type GalleryImage } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { deleteUpload, saveImage } from "@/server/storage";
-import { storageLimitError } from "@/server/limits";
+import { storageLimitError, writeBlockedReason } from "@/server/limits";
 
 export type GalleryState = { ok?: boolean; error?: string; images?: GalleryImage[] } | null;
 
@@ -90,6 +90,9 @@ export async function updateGalleryCaptionAction(
   const { business, db } = await currentBusiness();
   if (!business) return { error: "Нет доступа" };
 
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
   await db
     .update(galleryImages)
     .set({ caption: caption.trim().slice(0, 160) || null })
@@ -125,6 +128,9 @@ export async function deleteGalleryImageAction(imageId: string): Promise<Gallery
 export async function reorderGalleryAction(ids: string[]): Promise<GalleryState> {
   const { business, db } = await currentBusiness();
   if (!business) return { error: "Нет доступа" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
 
   await db.transaction(async (tx) => {
     for (const [index, id] of ids.entries()) {

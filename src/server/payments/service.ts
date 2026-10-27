@@ -15,6 +15,7 @@ import {
   createTelegramInvoice,
   type PaymentProviderId,
 } from "./config";
+import { logger } from "@/server/logger";
 
 const PERIOD_DAYS = 30;
 const PERIOD_MS = PERIOD_DAYS * 24 * 60 * 60 * 1000;
@@ -235,6 +236,16 @@ export async function completePayment(params: {
       .update(businesses)
       .set({ plan: payment.plan, trialEndsAt: null })
       .where(eq(businesses.id, business.id));
+
+    logger.info("payment.completed", {
+      paymentId: payment.id,
+      externalId: params.externalId,
+      businessId: business.id,
+      plan: payment.plan,
+      provider: payment.provider,
+      amount: plan.priceUzs,
+      periodEnd: periodEnd.toISOString(),
+    });
 
     return {
       ok: true as const,
