@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/server/db";
-import { businesses, services, staff, staffServices, workingHours } from "@/server/db/schema";
+import { businesses, scheduleExceptions, services, staff, staffServices, workingHours } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { serviceLimitError, staffLimitError, writeBlockedReason } from "@/server/limits";
 
@@ -332,3 +332,171 @@ export async function bulkAssignServicesAction(
   revalidatePath(`/dashboard/staff/${member.id}`);
   return { ok: true };
 }
+
+export async function toggleStaffAction(id: string, isActive: boolean): Promise<ActionState> {
+  const { business, db } = await myBusiness();
+  if (!business) return { error: "Нет доступа" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
+  await db
+    .update(staff)
+    .set({ isActive })
+    .where(and(eq(staff.id, id), eq(staff.businessId, business.id)));
+
+  revalidatePath("/dashboard/staff");
+  revalidatePath(`/dashboard/staff/${id}`);
+  revalidatePath(`/${business.slug}`);
+  return { ok: true };
+}
+
+export async function addScheduleExceptionAction({
+  staffId,
+  date,
+  isClosed,
+  startMinute,
+  endMinute,
+}: {
+  staffId: string;
+  date: string;
+  isClosed: boolean;
+  startMinute?: number;
+  endMinute?: number;
+}): Promise<ActionState> {
+  const { business, db } = await myBusiness();
+  if (!business) return { error: "Нет доступа" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
+  const [member] = await db
+    .select({ id: staff.id })
+    .from(staff)
+    .where(and(eq(staff.id, staffId), eq(staff.businessId, business.id)))
+    .limit(1);
+
+  if (!member) return { error: "Мастер не найден" };
+
+  if (!isClosed && (startMinute === undefined || endMinute === undefined || endMinute <= startMinute)) {
+    return { error: "Укажите корректные часы работы" };
+  }
+
+  await db
+    .insert(scheduleExceptions)
+    .values({
+      staffId: member.id,
+      date,
+      isClosed,
+      startMinute: isClosed ? null : (startMinute ?? null),
+      endMinute: isClosed ? null : (endMinute ?? null),
+    })
+    .onConflictDoUpdate({
+      target: [scheduleExceptions.staffId, scheduleExceptions.date],
+      set: {
+        isClosed,
+        startMinute: isClosed ? null : (startMinute ?? null),
+        endMinute: isClosed ? null : (endMinute ?? null),
+      },
+    });
+
+  revalidatePath(`/dashboard/staff/${member.id}`);
+  revalidatePath(`/${business.slug}`);
+  return { ok: true };
+}
+
+export async function deleteScheduleExceptionAction(
+  exceptionId: string,
+  staffId: string,
+): Promise<ActionState> {
+  const { business, db } = await myBusiness();
+  if (!business) return { error: "Нет доступа" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
+  const [member] = await db
+    .select({ id: staff.id })
+    .from(staff)
+    .where(and(eq(staff.id, staffId), eq(staff.businessId, business.id)))
+    .limit(1);
+
+  if (!member) return { error: "Мастер не найден" };
+
+  await db
+    .delete(scheduleExceptions)
+    .where(and(eq(scheduleExceptions.id, exceptionId), eq(scheduleExceptions.staffId, member.id)));
+
+  revalidatePath(`/dashboard/staff/${member.id}`);
+  revalidatePath(`/${business.slug}`);
+  return { ok: true };
+}
+
+export async function bulkUpdateServicesAction({
+  serviceIds,
+  pricePercentChange,
+  priceFixed,
+  durationChangeMin,
+  durationFixed,
+  category,
+  isActive,
+}: {
+  serviceIds: string[];
+  pricePercentChange?: number;
+  priceFixed?: number;
+  durationChangeMin?: number;
+  durationFixed?: number;
+  category?: string;
+  isActive?: boolean;
+}): Promise<ActionState> {
+  const { business, db } = await myBusiness();
+  if (!business) return { error: "Нет доступа" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
+  if (serviceIds.length === 0) return { error: "Выберите хотя бы одну услугу" };
+
+  const currentServices = await db
+    .select()
+    .from(services)
+    .where(and(eq(services.businessId, business.id), inArray(services.id, serviceIds)));
+
+  for (const s of currentServices) {
+    let newPrice = s.price;
+    if (priceFixed !== undefined) {
+      newPrice = Math.max(0, priceFixed);
+    } else if (pricePercentChange !== undefined) {
+      newPrice = Math.max(0, Math.round(s.price * (1 + pricePercentChange / 100)));
+    }
+
+    let newDuration = s.durationMin;
+    if (durationFixed !== undefined) {
+      newDuration = Math.max(5, durationFixed);
+    } else if (durationChangeMin !== undefined) {
+      newDuration = Math.max(5, s.durationMin + durationChangeMin);
+    }
+
+    const updates: Partial<typeof services.$inferInsert> = {
+      price: newPrice,
+      durationMin: newDuration,
+    };
+
+    if (category !== undefined) {
+      updates.category = category.trim() || null;
+    }
+    if (isActive !== undefined) {
+      updates.isActive = isActive;
+    }
+
+    await db
+      .update(services)
+      .set(updates)
+      .where(eq(services.id, s.id));
+  }
+
+  revalidatePath("/dashboard/services");
+  revalidatePath(`/${business.slug}`);
+  return { ok: true };
+}
+

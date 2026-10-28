@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { staff, staffServices, workingHours } from "@/server/db/schema";
+import { bookings, scheduleExceptions, staff, staffServices, workingHours } from "@/server/db/schema";
 import { getMyBusiness } from "@/server/auth/session";
 import { getOwnerServices } from "@/server/business/public";
 import { StaffEditor } from "@/components/dashboard/staff-editor";
@@ -27,7 +27,7 @@ export default async function StaffMemberPage({
 
   if (!member) notFound();
 
-  const [serviceLinks, hours, services] = await Promise.all([
+  const [serviceLinks, hours, exceptions, services, bookingRows] = await Promise.all([
     db
       .select({ serviceId: staffServices.serviceId })
       .from(staffServices)
@@ -41,8 +41,31 @@ export default async function StaffMemberPage({
       .from(workingHours)
       .where(eq(workingHours.staffId, member.id))
       .orderBy(asc(workingHours.weekday)),
+    db
+      .select({
+        id: scheduleExceptions.id,
+        date: scheduleExceptions.date,
+        isClosed: scheduleExceptions.isClosed,
+        startMinute: scheduleExceptions.startMinute,
+        endMinute: scheduleExceptions.endMinute,
+      })
+      .from(scheduleExceptions)
+      .where(eq(scheduleExceptions.staffId, member.id))
+      .orderBy(asc(scheduleExceptions.date)),
     getOwnerServices(business.id),
+    db
+      .select({
+        price: bookings.price,
+        status: bookings.status,
+        durationMin: bookings.durationMin,
+      })
+      .from(bookings)
+      .where(eq(bookings.staffId, member.id)),
   ]);
+
+  const completed = bookingRows.filter((b) => b.status === "COMPLETED" || b.status === "CONFIRMED");
+  const totalRevenue = completed.reduce((sum, b) => sum + b.price, 0);
+  const totalMinutes = completed.reduce((sum, b) => sum + b.durationMin, 0);
 
   return (
     <StaffEditor
@@ -61,6 +84,14 @@ export default async function StaffMemberPage({
         isActive: s.isActive,
       }))}
       schedule={hours}
+      exceptions={exceptions}
+      stats={{
+        totalBookings: bookingRows.length,
+        completedVisits: completed.length,
+        totalRevenue,
+        totalHours: Math.round((totalMinutes / 60) * 10) / 10,
+      }}
+      currency={business.currency}
     />
   );
 }
