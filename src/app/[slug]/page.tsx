@@ -55,6 +55,7 @@ export default async function PublicSalonPage({
           city: business.city,
           phone: business.phone,
           instagram: business.instagram,
+          website: business.website,
           timezone: business.timezone,
           currency: business.currency,
           accent: business.theme.accent,

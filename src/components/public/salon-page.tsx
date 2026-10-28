@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Clock3, Instagram, MapPin, Phone, Scissors, Sparkles } from "lucide-react";
+import { ArrowUpRight, Clock3, Globe, Instagram, MapPin, Phone, Scissors, Sparkles } from "lucide-react";
 import { BookingWizard, type WizardService, type WizardStaff } from "./booking-wizard";
 import { formatMoney } from "@/lib/plans";
 
@@ -33,6 +33,7 @@ export type SalonData = {
     city: string | null;
     phone: string | null;
     instagram: string | null;
+    website: string | null;
     timezone: string;
     currency: string;
     accent: string;
@@ -407,6 +408,20 @@ function RenderContacts({ business }: { business: SalonData["business"] }) {
               Instagram
             </p>
             <p className="mt-1 text-[13px] font-medium">@{business.instagram.replace("@", "")}</p>
+          </a>
+        )}
+        {business.website && (
+          <a
+            href={business.website.startsWith("http") ? business.website : `https://${business.website}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-2xl border border-black/[0.06] bg-white p-4 transition-colors hover:bg-[#fcfbfa]"
+          >
+            <Globe size={16} strokeWidth={1.6} className="text-muted" />
+            <p className="mt-2.5 text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
+              Сайт
+            </p>
+            <p className="mt-1 truncate text-[13px] font-medium">{business.website.replace(/^https?:\/\//, "")}</p>
           </a>
         )}
       </div>
