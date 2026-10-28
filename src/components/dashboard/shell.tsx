@@ -148,23 +148,29 @@ export function DashboardShell({
 
   return (
     <div className="min-h-dvh bg-paper">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] border-r border-line bg-white lg:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] border-r border-line bg-white md:block">
         {sidebar}
       </aside>
 
-      <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-white/90 px-4 backdrop-blur-xl lg:hidden">
-        <Logo />
+      <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-white/90 px-4 backdrop-blur-xl md:hidden">
+        <div className="flex items-center gap-2.5">
+          <Logo />
+          <span className="max-w-[140px] truncate text-[11px] font-medium text-muted">
+            {business.name}
+          </span>
+        </div>
         <button
           onClick={() => setOpen(true)}
-          className="grid size-9 place-items-center rounded-lg border border-line"
+          className="flex items-center gap-1.5 rounded-xl border border-line bg-white px-2.5 py-1.5 text-[12px] font-medium text-ink shadow-sm"
           aria-label="Меню"
         >
-          <Menu size={17} strokeWidth={1.6} />
+          <Menu size={16} strokeWidth={1.6} />
+          <span>Меню</span>
         </button>
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="fixed inset-0 z-50 md:hidden">
           <button
             className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
             onClick={() => setOpen(false)}
@@ -183,7 +189,56 @@ export function DashboardShell({
         </div>
       )}
 
-      <main className="lg:pl-[248px]">
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-center justify-around border-t border-line bg-white/95 px-2 backdrop-blur-xl md:hidden">
+        <Link
+          href="/dashboard"
+          className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
+            pathname === "/dashboard" ? "text-brand" : "text-muted hover:text-ink"
+          }`}
+        >
+          <LayoutGrid size={18} strokeWidth={pathname === "/dashboard" ? 2 : 1.6} />
+          <span>Обзор</span>
+        </Link>
+        <Link
+          href="/dashboard/bookings"
+          className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
+            pathname.startsWith("/dashboard/bookings") ? "text-brand" : "text-muted hover:text-ink"
+          }`}
+        >
+          <CalendarDays size={18} strokeWidth={pathname.startsWith("/dashboard/bookings") ? 2 : 1.6} />
+          <span>Записи</span>
+        </Link>
+        <Link
+          href="/dashboard/clients"
+          className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
+            pathname.startsWith("/dashboard/clients") ? "text-brand" : "text-muted hover:text-ink"
+          }`}
+        >
+          <Contact2 size={18} strokeWidth={pathname.startsWith("/dashboard/clients") ? 2 : 1.6} />
+          <span>Клиенты</span>
+        </Link>
+        <Link
+          href="/dashboard/services"
+          className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
+            pathname.startsWith("/dashboard/services") ? "text-brand" : "text-muted hover:text-ink"
+          }`}
+        >
+          <Scissors size={18} strokeWidth={pathname.startsWith("/dashboard/services") ? 2 : 1.6} />
+          <span>Услуги</span>
+        </Link>
+        <button
+          onClick={() => setOpen(true)}
+          className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
+            open ? "text-brand" : "text-muted hover:text-ink"
+          }`}
+        >
+          <Menu size={18} strokeWidth={1.6} />
+          <span>Меню</span>
+        </button>
+      </nav>
+
+      <main className="pb-20 md:pb-0 md:pl-[248px]">
         <div className="mx-auto w-full max-w-[1240px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
           {business.trialExpired && pathname !== "/dashboard/billing" && (
             <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-rose/25 bg-rose/5 px-4 py-3">

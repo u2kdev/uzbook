@@ -68,11 +68,15 @@ export default function HomePage() {
             </a>
           </nav>
           <div className="flex items-center gap-2">
-            <Link href="/login" className="btn btn-quiet hidden sm:inline-flex">
+            <Link
+              href="/login"
+              className="inline-flex h-9 items-center justify-center rounded-full border border-line bg-white/90 px-3 text-[13px] font-medium text-ink shadow-sm transition hover:bg-paper hover:text-brand sm:h-10 sm:px-4"
+            >
               Войти
             </Link>
-            <Link href="/register" className="btn btn-primary h-10 px-4 text-[13px]">
-              Создать страницу
+            <Link href="/register" className="btn btn-primary h-9 px-3.5 text-[13px] sm:h-10 sm:px-4">
+              <span className="hidden sm:inline">Создать страницу</span>
+              <span className="sm:hidden">Создать</span>
             </Link>
           </div>
         </div>
