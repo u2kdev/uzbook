@@ -41,10 +41,10 @@ export default async function AdminOverviewPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-            Пульт управления
+            Дашборд · {session.role === "ADMIN" ? "Администратор" : "Поддержка"}
           </p>
           <h1 className="mt-1.5 text-[28px] leading-tight font-semibold tracking-[-0.03em]">
-            {session.role === "ADMIN" ? "Платформа uzbook" : "Поддержка uzbook"}
+            {session.role === "ADMIN" ? "Дашборд платформы" : "Дашборд поддержки"}
           </h1>
           <p className="mt-1 text-[12.5px] text-muted">
             {stats.activeBusinesses} из {stats.businesses} бизнесов активны ·{" "}

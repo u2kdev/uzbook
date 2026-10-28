@@ -164,11 +164,11 @@ export function DashboardShell({
 
   return (
     <div className="min-h-dvh bg-paper">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] border-r border-line bg-white md:block">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[240px] border-r border-line bg-white sm:block">
         {sidebar}
       </aside>
 
-      <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-white/90 px-4 backdrop-blur-xl md:hidden">
+      <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-white/90 px-4 backdrop-blur-xl sm:hidden">
         <div className="flex items-center gap-2.5">
           <Logo />
           <span className="max-w-[140px] truncate text-[11px] font-medium text-muted">
@@ -178,15 +178,15 @@ export function DashboardShell({
         <button
           onClick={() => setOpen(true)}
           className="flex items-center gap-1.5 rounded-xl border border-line bg-white px-2.5 py-1.5 text-[12px] font-medium text-ink shadow-sm"
-          aria-label="Меню"
+          aria-label="Боковое меню"
         >
           <Menu size={16} strokeWidth={1.6} />
-          <span>Меню</span>
+          <span>Боковое меню</span>
         </button>
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="fixed inset-0 z-50 sm:hidden">
           <button
             className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
             onClick={() => setOpen(false)}
@@ -206,7 +206,7 @@ export function DashboardShell({
       )}
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-center justify-around border-t border-line bg-white/95 px-2 backdrop-blur-xl md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-center justify-around border-t border-line bg-white/95 px-2 backdrop-blur-xl sm:hidden">
         <Link
           href="/dashboard"
           className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
@@ -250,11 +250,11 @@ export function DashboardShell({
           }`}
         >
           <Menu size={18} strokeWidth={1.6} />
-          <span>Меню</span>
+          <span>Боковое меню</span>
         </button>
       </nav>
 
-      <main className="pb-20 md:pb-0 md:pl-[248px]">
+      <main className="pb-20 sm:pb-0 sm:pl-[240px]">
         <div className="mx-auto w-full max-w-[1240px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
           {business.trialExpired && pathname !== "/dashboard/billing" && (
             <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-rose/25 bg-rose/5 px-4 py-3">

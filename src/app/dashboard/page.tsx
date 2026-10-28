@@ -54,7 +54,7 @@ export default async function DashboardPage({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-            Обзор дня
+            Дашборд · Обзор дня
           </p>
           <h1 className="mt-1.5 text-[28px] leading-tight font-semibold tracking-[-0.03em]">
             {dateLabel}
