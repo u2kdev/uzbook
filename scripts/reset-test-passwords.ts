@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
-import { getDb } from "../src/server/db";
-import { users } from "../src/server/db/schema";
+import { getDb, closeDb } from "../src/server/db";
+import { users, businesses, subscriptions } from "../src/server/db/schema";
 
 try {
   process.loadEnvFile?.(".env");
@@ -21,9 +21,9 @@ async function main() {
     },
     {
       email: "owner@uzbook.online",
-      name: "Владелец платформы",
+      name: "Мадина Каримова (Owner)",
       password: "owner1234",
-      role: "ADMIN" as const,
+      role: "OWNER" as const,
     },
     {
       email: "support@uzbook.online",
@@ -90,7 +90,47 @@ async function main() {
     console.log(`  -> Verified: ${acc.email} / ${acc.password} [OK]`);
   }
 
+  // Link Atelier Noir with PRO plan to owner@uzbook.online
+  const [ownerUser] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, "owner@uzbook.online"))
+    .limit(1);
+
+  const [atelier] = await db
+    .select()
+    .from(businesses)
+    .where(eq(businesses.slug, "atelier-noir"))
+    .limit(1);
+
+  if (atelier && ownerUser) {
+    await db
+      .update(businesses)
+      .set({
+        ownerId: ownerUser.id,
+        plan: "PRO",
+        status: "ACTIVE",
+        trialEndsAt: null,
+      })
+      .where(eq(businesses.id, atelier.id));
+
+    const periodEnd = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+    await db.insert(subscriptions).values({
+      businessId: atelier.id,
+      plan: "PRO",
+      status: "ACTIVE",
+      provider: "DEMO",
+      amount: 199_000,
+      currency: "UZS",
+      startedAt: new Date(),
+      currentPeriodEnd: periodEnd,
+      note: "Подписка PRO активна",
+    });
+    console.log("Linked Atelier Noir (PRO plan) to owner@uzbook.online [OK]");
+  }
+
   console.log("\n=== ALL TEST CREDENTIALS SUCCESSFULLY RESET AND VERIFIED ===");
+  await closeDb();
   process.exit(0);
 }
 

@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
-import { getDb } from "../src/server/db";
+import { getDb, closeDb } from "../src/server/db";
 
 try {
   process.loadEnvFile?.(".env");
@@ -30,13 +30,13 @@ async function main() {
   const db = await getDb();
   const slug = "atelier-noir";
 
-  // Platform accounts (always upserted, even if the demo business already exists).
+  // Platform & Owner accounts
   const platformAccounts = [
     {
       email: "owner@uzbook.online",
-      name: "Владелец платформы",
+      name: "Мадина Каримова (Owner)",
       password: "owner1234",
-      role: "ADMIN" as const,
+      role: "OWNER" as const,
     },
     {
       email: "admin@uzbook.online",
@@ -49,6 +49,12 @@ async function main() {
       name: "Поддержка",
       password: "support1234",
       role: "SUPPORT" as const,
+    },
+    {
+      email: "demo@uzbook.online",
+      name: "Мадина Каримова (Demo)",
+      password: "demo1234",
+      role: "OWNER" as const,
     },
   ];
 
@@ -326,27 +332,11 @@ async function main() {
     return;
   }
 
-  const [owner] = await db
-    .insert(users)
-    .values({
-      email: "demo@uzbook.online",
-      name: "Мадина Каримова",
-      passwordHash: await bcrypt.hash("demo1234", 10),
-      role: "OWNER",
-      phone: "+998901234567",
-    })
-    .onConflictDoNothing()
-    .returning();
-
-  const ownerRow =
-    owner ??
-    (
-      await db
-        .select()
-        .from(users)
-        .where(eq(users.email, "demo@uzbook.online"))
-        .limit(1)
-    )[0];
+  const [ownerRow] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, "owner@uzbook.online"))
+    .limit(1);
 
   const [business] = await db
     .insert(businesses)
@@ -726,8 +716,12 @@ async function main() {
 }
 
 main()
-  .then(() => process.exit(0))
-  .catch((error) => {
+  .then(async () => {
+    await closeDb();
+    process.exit(0);
+  })
+  .catch(async (error) => {
     console.error(error);
+    await closeDb();
     process.exit(1);
   });

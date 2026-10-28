@@ -13,6 +13,7 @@ export type DB = PostgresJsDatabase<typeof schema>;
 const globalForDb = globalThis as unknown as {
   __uzbookDb?: DB;
   __uzbookDbReady?: Promise<DB>;
+  __uzbookPglite?: PGlite;
 };
 
 const migrationsFolder = path.resolve(process.cwd(), "drizzle");
@@ -25,8 +26,8 @@ async function createDb(): Promise<DB> {
     const dataDir = path.resolve(process.cwd(), ".data", "pg");
     mkdirSync(path.dirname(dataDir), { recursive: true });
     const client = new PGlite(dataDir);
+    globalForDb.__uzbookPglite = client;
     const db = drizzlePglite(client, { schema, casing: "snake_case" });
-    await migratePglite(db, { migrationsFolder });
     return db as unknown as DB;
   }
 
@@ -67,6 +68,15 @@ export const db = new Proxy({} as DB, {
     );
   },
 }) as DB;
+
+export async function closeDb(): Promise<void> {
+  if (globalForDb.__uzbookPglite) {
+    await globalForDb.__uzbookPglite.close();
+    delete globalForDb.__uzbookPglite;
+    delete globalForDb.__uzbookDbReady;
+    delete globalForDb.__uzbookDb;
+  }
+}
 
 export { schema };
 export * from "./schema";

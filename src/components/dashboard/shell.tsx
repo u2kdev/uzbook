@@ -24,7 +24,7 @@ const NAV = [
   {
     label: "Работа",
     items: [
-      { href: "/dashboard", label: "Обзор дня", icon: LayoutGrid },
+      { href: "/dashboard", label: "Дашборд", icon: LayoutGrid },
       { href: "/dashboard/bookings", label: "Записи", icon: CalendarDays },
       { href: "/dashboard/clients", label: "Клиенты", icon: Contact2 },
     ],
@@ -108,7 +108,7 @@ export function DashboardShell({
         ))}
       </nav>
 
-      {business.plan === "TRIAL" && (
+      {business.plan === "TRIAL" ? (
         <div className="rounded-2xl bg-brand-soft p-3.5">
           <p className="text-[12px] font-semibold text-brand-dark">Пробный период</p>
           <p className="mt-1 text-[11.5px] leading-relaxed text-brand-dark/70">
@@ -121,6 +121,22 @@ export function DashboardShell({
             className="mt-2.5 inline-flex text-[11.5px] font-semibold text-brand-dark underline underline-offset-4"
           >
             Выбрать тариф
+          </Link>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-mint/25 bg-mint/5 p-3.5">
+          <div className="flex items-center justify-between">
+            <p className="text-[12px] font-semibold text-ink">Тариф {business.plan}</p>
+            <span className="rounded-full bg-mint/15 px-2 py-0.5 text-[9.5px] font-bold text-mint uppercase">
+              Активен
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] text-muted">Подписка оплачена · Полный доступ</p>
+          <Link
+            href="/dashboard/billing"
+            className="mt-2 inline-flex text-[11.5px] font-medium text-brand hover:underline"
+          >
+            Управление тарифом
           </Link>
         </div>
       )}
@@ -198,7 +214,7 @@ export function DashboardShell({
           }`}
         >
           <LayoutGrid size={18} strokeWidth={pathname === "/dashboard" ? 2 : 1.6} />
-          <span>Обзор</span>
+          <span>Дашборд</span>
         </Link>
         <Link
           href="/dashboard/bookings"
