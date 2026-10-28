@@ -90,10 +90,10 @@ export function AdminShell({
 
       <div className="flex items-center gap-2.5 border-t border-line pt-3">
         <span className="grid size-8 shrink-0 place-items-center rounded-full bg-paper text-[11px] font-semibold text-ink-soft ring-1 ring-line">
-          {user.name.slice(0, 1).toUpperCase()}
+          {(user.name || user.email || "A").slice(0, 1).toUpperCase()}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[12.5px] font-medium">{user.name}</p>
+          <p className="truncate text-[12.5px] font-medium">{user.name || (isAdmin ? "Админ" : "Поддержка")}</p>
           <p className="truncate text-[10.5px] text-muted">{user.email}</p>
         </div>
         <form action={logoutAction}>
@@ -110,107 +110,114 @@ export function AdminShell({
   );
 
   return (
-    <div className="min-h-dvh bg-paper">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[240px] border-r border-line bg-white sm:block">
+    <div className="flex min-h-dvh bg-paper">
+      {/* Desktop / Tablet Sidebar */}
+      <aside className="sticky top-0 z-30 hidden h-dvh w-[240px] shrink-0 flex-col border-r border-line bg-white sm:flex">
         {sidebar}
       </aside>
 
-      <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-white/90 px-4 backdrop-blur-xl sm:hidden">
-        <div className="flex items-center gap-2">
-          <Logo />
-          <span className="rounded-full bg-ink px-2 py-0.5 text-[9px] font-semibold tracking-wide text-white uppercase">
-            {isAdmin ? "Admin" : "Support"}
-          </span>
-        </div>
-        <button
-          onClick={() => setOpen(true)}
-          className="flex items-center gap-1.5 rounded-xl border border-line bg-white px-2.5 py-1.5 text-[12px] font-medium text-ink shadow-sm"
-          aria-label="Боковое меню"
-        >
-          <Menu size={16} strokeWidth={1.6} />
-          <span>Боковое меню</span>
-        </button>
-      </div>
-
-      {open && (
-        <div className="fixed inset-0 z-50 sm:hidden">
-          <button
-            className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
-            onClick={() => setOpen(false)}
-            aria-label="Закрыть меню"
-          />
-          <div className="absolute inset-y-0 left-0 w-[280px] bg-white shadow-lift">
-            <button
-              onClick={() => setOpen(false)}
-              className="absolute top-4 right-4 z-10 grid size-8 place-items-center rounded-lg bg-paper"
-              aria-label="Закрыть"
-            >
-              <X size={16} strokeWidth={1.6} />
-            </button>
-            {sidebar}
-          </div>
-        </div>
-      )}
-
-      {/* Mobile Bottom Navigation Bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-center justify-around border-t border-line bg-white/95 px-2 backdrop-blur-xl sm:hidden">
-        <Link
-          href="/admin"
-          className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
-            pathname === "/admin" ? "text-brand" : "text-muted hover:text-ink"
-          }`}
-        >
-          <LayoutGrid size={18} strokeWidth={pathname === "/admin" ? 2 : 1.6} />
-          <span>Дашборд</span>
-        </Link>
-        <Link
-          href="/admin/businesses"
-          className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
-            pathname.startsWith("/admin/businesses") ? "text-brand" : "text-muted hover:text-ink"
-          }`}
-        >
-          <Building2 size={18} strokeWidth={pathname.startsWith("/admin/businesses") ? 2 : 1.6} />
-          <span>Бизнесы</span>
-        </Link>
-        <Link
-          href="/admin/requests"
-          className={`relative flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
-            pathname.startsWith("/admin/requests") ? "text-brand" : "text-muted hover:text-ink"
-          }`}
-        >
-          <Inbox size={18} strokeWidth={pathname.startsWith("/admin/requests") ? 2 : 1.6} />
-          <span>Заявки</span>
-          {pendingCount > 0 && (
-            <span className="absolute top-1 right-2 grid size-4 place-items-center rounded-full bg-amber text-[9px] font-bold text-white">
-              {pendingCount}
+      {/* Main Content Column */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile Top Header (< 640px) */}
+        <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-white/90 px-4 backdrop-blur-xl sm:hidden">
+          <div className="flex items-center gap-2">
+            <Logo />
+            <span className="rounded-full bg-ink px-2 py-0.5 text-[9px] font-semibold tracking-wide text-white uppercase">
+              {isAdmin ? "Admin" : "Support"}
             </span>
-          )}
-        </Link>
-        <Link
-          href="/admin/users"
-          className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
-            pathname.startsWith("/admin/users") ? "text-brand" : "text-muted hover:text-ink"
-          }`}
-        >
-          <Users size={18} strokeWidth={pathname.startsWith("/admin/users") ? 2 : 1.6} />
-          <span>Юзеры</span>
-        </Link>
-        <button
-          onClick={() => setOpen(true)}
-          className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
-            open ? "text-brand" : "text-muted hover:text-ink"
-          }`}
-        >
-          <Menu size={18} strokeWidth={1.6} />
-          <span>Боковое меню</span>
-        </button>
-      </nav>
-
-      <main className="pb-20 sm:pb-0 sm:pl-[240px]">
-        <div className="mx-auto w-full max-w-[1240px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
-          {children}
+          </div>
+          <button
+            onClick={() => setOpen(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-line bg-white px-2.5 py-1.5 text-[12px] font-medium text-ink shadow-sm"
+            aria-label="Боковое меню"
+          >
+            <Menu size={16} strokeWidth={1.6} />
+            <span>Боковое меню</span>
+          </button>
         </div>
-      </main>
+
+        {/* Mobile Drawer */}
+        {open && (
+          <div className="fixed inset-0 z-50 sm:hidden">
+            <button
+              className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+              onClick={() => setOpen(false)}
+              aria-label="Закрыть меню"
+            />
+            <div className="absolute inset-y-0 left-0 w-[280px] bg-white shadow-lift">
+              <button
+                onClick={() => setOpen(false)}
+                className="absolute top-4 right-4 z-10 grid size-8 place-items-center rounded-lg bg-paper"
+                aria-label="Закрыть"
+              >
+                <X size={16} strokeWidth={1.6} />
+              </button>
+              {sidebar}
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Bottom Navigation Bar */}
+        <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-center justify-around border-t border-line bg-white/95 px-2 backdrop-blur-xl sm:hidden">
+          <Link
+            href="/admin"
+            className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
+              pathname === "/admin" ? "text-brand" : "text-muted hover:text-ink"
+            }`}
+          >
+            <LayoutGrid size={18} strokeWidth={pathname === "/admin" ? 2 : 1.6} />
+            <span>Дашборд</span>
+          </Link>
+          <Link
+            href="/admin/businesses"
+            className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
+              pathname.startsWith("/admin/businesses") ? "text-brand" : "text-muted hover:text-ink"
+            }`}
+          >
+            <Building2 size={18} strokeWidth={pathname.startsWith("/admin/businesses") ? 2 : 1.6} />
+            <span>Бизнесы</span>
+          </Link>
+          <Link
+            href="/admin/requests"
+            className={`relative flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
+              pathname.startsWith("/admin/requests") ? "text-brand" : "text-muted hover:text-ink"
+            }`}
+          >
+            <Inbox size={18} strokeWidth={pathname.startsWith("/admin/requests") ? 2 : 1.6} />
+            <span>Заявки</span>
+            {pendingCount > 0 && (
+              <span className="absolute top-1 right-2 grid size-4 place-items-center rounded-full bg-amber text-[9px] font-bold text-white">
+                {pendingCount}
+              </span>
+            )}
+          </Link>
+          <Link
+            href="/admin/users"
+            className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
+              pathname.startsWith("/admin/users") ? "text-brand" : "text-muted hover:text-ink"
+            }`}
+          >
+            <Users size={18} strokeWidth={pathname.startsWith("/admin/users") ? 2 : 1.6} />
+            <span>Юзеры</span>
+          </Link>
+          <button
+            onClick={() => setOpen(true)}
+            className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
+              open ? "text-brand" : "text-muted hover:text-ink"
+            }`}
+          >
+            <Menu size={18} strokeWidth={1.6} />
+            <span>Боковое меню</span>
+          </button>
+        </nav>
+
+        {/* Main Content */}
+        <main className="flex-1 pb-20 sm:pb-8">
+          <div className="mx-auto w-full max-w-[1240px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
