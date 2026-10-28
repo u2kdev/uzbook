@@ -11,6 +11,8 @@ import {
   getPaymentByExternalId,
   markPaymentPending,
 } from "@/server/payments/service";
+import { sanitizePaymentPayload, trackWebhookFailure } from "@/server/payments/security";
+import { logger } from "@/server/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,13 +98,18 @@ async function findByOrder(orderId: string) {
 export async function POST(request: Request) {
   const ip = clientIp(request);
   if (!isIpAllowed(ip, process.env.PAYME_IP_ALLOWLIST)) {
+    trackWebhookFailure("payme", "ip_not_allowed", ip);
     return fail(null, ERRORS.auth);
   }
 
-  if (!authorized(request)) return fail(null, ERRORS.auth);
+  if (!authorized(request)) {
+    trackWebhookFailure("payme", "unauthorized", ip);
+    return fail(null, ERRORS.auth);
+  }
 
   const limit = rateLimit(`payme:${ip}`, 120, 60_000);
   if (!limit.ok) {
+    trackWebhookFailure("payme", "rate_limit_exceeded", ip);
     return Response.json(
       { jsonrpc: "2.0", id: null, error: { code: -32504, message: "Too many requests" } },
       {
@@ -118,12 +125,18 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as typeof body;
   } catch {
+    trackWebhookFailure("payme", "json_parse_error", ip);
     return fail(null, ERRORS.parse);
   }
 
   const id = body.id ?? null;
   const method = body.method ?? "";
   const params = body.params ?? {};
+
+  logger.info("payme.webhook_request", {
+    method,
+    params: sanitizePaymentPayload(params),
+  });
 
   if (method === "CheckPerformTransaction") {
     const orderId = params.account?.order_id ?? "";

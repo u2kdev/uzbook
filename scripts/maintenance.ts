@@ -1,4 +1,4 @@
-import { cancelStalePayments } from "../src/server/payments/expiry";
+import { cancelStalePayments, expireUnpaidPayments } from "../src/server/payments/expiry";
 import { expireSubscriptions } from "../src/server/subscriptions/expiry";
 import { cleanOrphanedUploads } from "../src/server/storage/cleanup";
 
@@ -9,14 +9,15 @@ try {
 }
 
 async function main() {
-  const [subscriptions, payments, uploads] = await Promise.all([
+  const [subscriptions, staleCancelled, unpaidExpired, uploads] = await Promise.all([
     expireSubscriptions(),
     cancelStalePayments(),
+    expireUnpaidPayments(),
     cleanOrphanedUploads(),
   ]);
 
   console.log(
-    `[maintenance] expired subscriptions: ${subscriptions.expired}/${subscriptions.scanned}; cancelled stale payments: ${payments}; cleaned orphaned uploads: ${uploads.deleted} (${uploads.freedBytes} bytes)`,
+    `[maintenance] expired subscriptions: ${subscriptions.expired}/${subscriptions.scanned}; cancelled stale: ${staleCancelled}; expired unpaid: ${unpaidExpired}; cleaned uploads: ${uploads.deleted}`,
   );
 }
 

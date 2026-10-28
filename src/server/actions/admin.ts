@@ -231,3 +231,49 @@ export async function pendingSubscriptions() {
     .orderBy(desc(subscriptions.createdAt))
     .limit(20);
 }
+
+export async function adminRefundPaymentAction(
+  paymentId: string,
+  reason = "Возврат администратором",
+): Promise<AdminState> {
+  const session = await requireAdminRole();
+  const { refundPayment } = await import("@/server/payments/service");
+  const result = await refundPayment({
+    paymentId,
+    reason,
+    refundedByUserId: session.id,
+  });
+
+  if (!result.ok) {
+    return { error: result.error ?? "Не удалось оформить возврат" };
+  }
+
+  refresh();
+  return { ok: true };
+}
+
+export async function adminCancelPaymentAction(
+  paymentId: string,
+  reason = "Отменено администратором",
+): Promise<AdminState> {
+  const session = await requireAdminRole();
+  const { cancelPaymentByAdmin } = await import("@/server/payments/service");
+  const result = await cancelPaymentByAdmin({
+    paymentId,
+    reason,
+    adminUserId: session.id,
+  });
+
+  if (!result.ok) {
+    return { error: result.error ?? "Не удалось отменить платёж" };
+  }
+
+  refresh();
+  return { ok: true };
+}
+
+export async function adminReconcileBusinessAction(businessId: string) {
+  await requireAdminRole();
+  const { reconcilePaymentSubscription } = await import("@/server/payments/service");
+  return reconcilePaymentSubscription(businessId);
+}

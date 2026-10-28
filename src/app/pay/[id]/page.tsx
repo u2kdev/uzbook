@@ -53,8 +53,10 @@ export default async function PaymentPage({
   const isPaid = payment.status === "PAID";
   const isFailed = payment.status === "FAILED";
   const isCancelled = payment.status === "CANCELLED";
-  const pendingPayment = !isPaid && !isFailed && !isCancelled;
-  const expired = pendingPayment && isPaymentExpired(payment);
+  const isExpired = payment.status === "EXPIRED";
+  const isRefunded = payment.status === "REFUNDED";
+  const pendingPayment = !isPaid && !isFailed && !isCancelled && !isExpired && !isRefunded;
+  const expired = isExpired || (pendingPayment && isPaymentExpired(payment));
 
   return (
     <main className="min-h-screen bg-paper px-4 py-10 sm:py-16">
@@ -76,11 +78,15 @@ export default async function PaymentPage({
                 <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
                   {isPaid
                     ? "Оплачено"
-                    : isFailed
-                      ? "Платёж не прошёл"
-                      : isCancelled
-                        ? "Платёж отменён"
-                        : "Ожидает оплаты"}
+                    : isRefunded
+                      ? "Средства возвращены"
+                      : isExpired
+                        ? "Срок счёта истёк"
+                        : isFailed
+                          ? "Платёж не прошёл"
+                          : isCancelled
+                            ? "Платёж отменён"
+                            : "Ожидает оплаты"}
                 </p>
                 <h1 className="mt-1.5 text-[24px] leading-tight font-semibold tracking-[-0.03em]">
                   Тариф «{plan.name}»
@@ -158,14 +164,19 @@ export default async function PaymentPage({
                     provider={payment.provider}
                     checkoutUrl={checkoutUrl}
                     testMode={payment.provider === "DEMO" && demoPaymentsEnabled()}
+                    payload={payload}
                   />
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="rounded-2xl bg-rose/5 px-4 py-3.5 text-[12.5px] leading-relaxed text-rose">
-                    {isFailed
-                      ? "Банк отклонил платёж или он был отменён. Деньги не списаны."
-                      : "Платёж отменён. Деньги не списаны."}
+                    {isRefunded
+                      ? "Платёж был успешно возвращён. Подписка деактивирована."
+                      : isExpired
+                        ? "Срок действия счёта истёк (30 минут). Создайте новый платёж."
+                        : isFailed
+                          ? "Банк отклонил платёж или он был отменён. Деньги не списаны."
+                          : "Платёж отменён. Деньги не списаны."}
                   </div>
                   <Link
                     href="/dashboard/billing"

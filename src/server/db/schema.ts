@@ -52,6 +52,8 @@ export const paymentStatusEnum = pgEnum("payment_status", [
   "PAID",
   "CANCELLED",
   "FAILED",
+  "EXPIRED",
+  "REFUNDED",
 ]);
 
 export const pageSectionTypeEnum = pgEnum("page_section_type", [
@@ -389,12 +391,30 @@ export const galleryImages = pgTable(
   (t) => [index("gallery_images_business_idx").on(t.businessId)],
 );
 
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("audit_logs_entity_idx").on(t.entityType, t.entityId),
+    index("audit_logs_created_idx").on(t.createdAt),
+  ],
+);
+
 /* ------------------------------------------------------------------ */
 /* Relations                                                           */
 /* ------------------------------------------------------------------ */
 
 export const usersRelations = relations(users, ({ many }) => ({
   businesses: many(businesses),
+  auditLogs: many(auditLogs),
 }));
 
 export const businessesRelations = relations(businesses, ({ one, many }) => ({
@@ -434,6 +454,10 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
   business: one(businesses, { fields: [payments.businessId], references: [businesses.id] }),
 }));
 
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  user: one(users, { fields: [auditLogs.userId], references: [users.id] }),
+}));
+
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
@@ -448,3 +472,5 @@ export type Subscription = typeof subscriptions.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type PageSection = typeof pageSections.$inferSelect;
 export type GalleryImage = typeof galleryImages.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;
+

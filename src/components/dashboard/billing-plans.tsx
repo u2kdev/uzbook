@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Check,
   ChevronRight,
+  Coins,
   CreditCard,
   FlaskConical,
   Landmark,
@@ -20,7 +21,7 @@ import {
 import { startPaymentAction, type PaymentActionState } from "@/server/actions/payments";
 import { PLANS, formatMoney, type PlanId } from "@/lib/plans";
 
-type ProviderId = "PAYME" | "CLICK" | "TELEGRAM_STARS" | "DEMO" | "MANUAL";
+type ProviderId = "PAYME" | "CLICK" | "TELEGRAM_STARS" | "DEMO" | "MANUAL" | "CRYPTO";
 
 type Provider = {
   id: ProviderId;
@@ -35,6 +36,7 @@ const PROVIDER_ICONS: Record<ProviderId, typeof CreditCard> = {
   TELEGRAM_STARS: Star,
   DEMO: FlaskConical,
   MANUAL: Landmark,
+  CRYPTO: Coins,
 };
 
 export function BillingPlans({

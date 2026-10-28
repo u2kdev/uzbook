@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import {
   businesses,
   payments,
   subscriptions,
+  auditLogs,
   type Business,
   type Payment,
 } from "@/server/db/schema";
@@ -73,6 +74,18 @@ export async function createPayment(params: {
     if (!invoiceUrl) throw new Error("Не удалось создать счёт в Telegram");
     url = invoiceUrl;
     payload = { invoiceUrl };
+  } else if (provider === "CRYPTO") {
+    const { cryptoDepositConfig } = await import("./config");
+    const conf = cryptoDepositConfig();
+    const cryptoAmount = Number((plan.priceUzs / conf.rateUzs).toFixed(2));
+    url = `/pay/${externalId}`;
+    payload = {
+      asset: conf.asset,
+      network: conf.network,
+      depositAddress: conf.address,
+      cryptoAmount,
+      rateUzs: conf.rateUzs,
+    };
   } else if (provider !== "DEMO") {
     throw new Error("Этот способ оплаты пока не поддерживается");
   }
@@ -154,6 +167,27 @@ export async function completePayment(params: {
       .for("update");
 
     if (!payment) return { ok: false as const, error: "Платёж не найден" };
+
+    if (params.providerTxnId) {
+      const [duplicateTx] = await tx
+        .select()
+        .from(payments)
+        .where(
+          and(
+            eq(payments.providerTxnId, params.providerTxnId),
+            ne(payments.id, payment.id),
+            eq(payments.status, "PAID"),
+          ),
+        )
+        .limit(1);
+
+      if (duplicateTx) {
+        return {
+          ok: false as const,
+          error: "Транзакция с таким идентификатором уже была обработана",
+        };
+      }
+    }
 
     const [business] = await tx
       .select()
@@ -321,6 +355,194 @@ export async function getActiveSubscription(businessId: string) {
     .orderBy(sql`${subscriptions.currentPeriodEnd} desc nulls last`)
     .limit(1);
   return row ?? null;
+}
+
+export async function recordAuditLog(params: {
+  userId?: string | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  details?: Record<string, unknown>;
+}): Promise<void> {
+  const db = await getDb();
+  await db.insert(auditLogs).values({
+    userId: params.userId ?? null,
+    action: params.action,
+    entityType: params.entityType,
+    entityId: params.entityId,
+    details: params.details ?? {},
+  });
+}
+
+export async function refundPayment(params: {
+  externalId?: string;
+  paymentId?: string;
+  reason?: string;
+  refundedByUserId?: string | null;
+}): Promise<{ ok: boolean; error?: string }> {
+  const db = await getDb();
+  const conditions: SQL[] = [];
+  if (params.paymentId) conditions.push(eq(payments.id, params.paymentId));
+  if (params.externalId) conditions.push(eq(payments.externalId, params.externalId));
+  if (conditions.length === 0) return { ok: false, error: "payment_not_specified" };
+
+  return db.transaction(async (tx) => {
+    const [payment] = await tx
+      .select()
+      .from(payments)
+      .where(and(...conditions))
+      .limit(1)
+      .for("update");
+
+    if (!payment) return { ok: false, error: "not_found" };
+    if (payment.status !== "PAID") return { ok: false, error: "payment_not_paid" };
+
+    const now = new Date();
+    await tx
+      .update(payments)
+      .set({
+        status: "REFUNDED",
+        payload: {
+          ...(payment.payload ?? {}),
+          refund_reason: params.reason ?? "customer_refund",
+          refunded_at: now.toISOString(),
+          refunded_by: params.refundedByUserId ?? null,
+        },
+        updatedAt: now,
+      })
+      .where(eq(payments.id, payment.id));
+
+    // Cancel current active subscription
+    await tx
+      .update(subscriptions)
+      .set({ status: "CANCELLED", note: `Возврат средств: ${params.reason ?? "клиентский возврат"}` })
+      .where(
+        and(eq(subscriptions.businessId, payment.businessId), eq(subscriptions.status, "ACTIVE")),
+      );
+
+    // Rollback business plan to TRIAL
+    await tx
+      .update(businesses)
+      .set({ plan: "TRIAL" })
+      .where(eq(businesses.id, payment.businessId));
+
+    await tx.insert(auditLogs).values({
+      userId: params.refundedByUserId ?? null,
+      action: "payment.refunded",
+      entityType: "payment",
+      entityId: payment.id,
+      details: {
+        externalId: payment.externalId,
+        businessId: payment.businessId,
+        amount: payment.amount,
+        currency: payment.currency,
+        reason: params.reason,
+      },
+    });
+
+    return { ok: true };
+  });
+}
+
+export async function cancelPaymentByAdmin(params: {
+  paymentId: string;
+  reason: string;
+  adminUserId: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const db = await getDb();
+  const [payment] = await db
+    .select()
+    .from(payments)
+    .where(eq(payments.id, params.paymentId))
+    .limit(1);
+
+  if (!payment) return { ok: false, error: "not_found" };
+  if (payment.status === "PAID") {
+    return { ok: false, error: "cannot_cancel_paid_payment_use_refund" };
+  }
+
+  const now = new Date();
+  await db
+    .update(payments)
+    .set({
+      status: "CANCELLED",
+      payload: {
+        ...(payment.payload ?? {}),
+        cancel_reason: params.reason,
+        cancelled_by_admin: params.adminUserId,
+      },
+      updatedAt: now,
+    })
+    .where(eq(payments.id, payment.id));
+
+  await recordAuditLog({
+    userId: params.adminUserId,
+    action: "payment.admin_cancelled",
+    entityType: "payment",
+    entityId: payment.id,
+    details: { reason: params.reason, externalId: payment.externalId },
+  });
+
+  return { ok: true };
+}
+
+export async function reconcilePaymentSubscription(businessId: string): Promise<{
+  businessId: string;
+  hasActiveSubscription: boolean;
+  activePlan: string;
+  lastPayment: { id: string; status: string; plan: string; paidAt: Date | null } | null;
+  synced: boolean;
+  message: string;
+}> {
+  const db = await getDb();
+  const [biz] = await db.select().from(businesses).where(eq(businesses.id, businessId)).limit(1);
+  if (!biz) throw new Error("business_not_found");
+
+  const [activeSub] = await db
+    .select()
+    .from(subscriptions)
+    .where(and(eq(subscriptions.businessId, businessId), eq(subscriptions.status, "ACTIVE")))
+    .orderBy(sql`${subscriptions.currentPeriodEnd} desc nulls last`)
+    .limit(1);
+
+  const [lastPayment] = await db
+    .select()
+    .from(payments)
+    .where(eq(payments.businessId, businessId))
+    .orderBy(sql`${payments.createdAt} desc`)
+    .limit(1);
+
+  const now = new Date();
+  const isSubValid = Boolean(
+    activeSub?.currentPeriodEnd && activeSub.currentPeriodEnd.getTime() > now.getTime(),
+  );
+
+  let synced = true;
+  let message = "OK: Состояние синхронизировано";
+
+  if (lastPayment?.status === "PAID" && !isSubValid) {
+    synced = false;
+    message = "Внимание: последний платёж успешен, но активная подписка истекла или отсутствует";
+  } else if (biz.plan !== "TRIAL" && !isSubValid && !biz.trialEndsAt) {
+    synced = false;
+    message = "Внимание: у бизнеса установлен платный тариф, но нет активной подписки";
+  }
+
+  return {
+    businessId,
+    hasActiveSubscription: isSubValid,
+    activePlan: biz.plan,
+    lastPayment: lastPayment
+      ? {
+          id: lastPayment.id,
+          status: lastPayment.status,
+          plan: lastPayment.plan,
+          paidAt: lastPayment.paidAt,
+        }
+      : null,
+    synced,
+    message,
+  };
 }
 
 export { PERIOD_DAYS };

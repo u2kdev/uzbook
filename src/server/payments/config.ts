@@ -1,6 +1,6 @@
 import type { Plan } from "@/lib/plans";
 
-export type PaymentProviderId = "PAYME" | "CLICK" | "TELEGRAM_STARS" | "DEMO" | "MANUAL";
+export type PaymentProviderId = "PAYME" | "CLICK" | "TELEGRAM_STARS" | "DEMO" | "MANUAL" | "CRYPTO";
 
 export type ProviderOption = {
   id: PaymentProviderId;
@@ -53,6 +53,21 @@ export function demoPaymentsEnabled(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
+export function cryptoPaymentsEnabled(): boolean {
+  const flag = process.env.PAYMENTS_CRYPTO?.trim().toLowerCase();
+  if (["off", "false", "0", "no"].includes(flag ?? "")) return false;
+  if (["on", "true", "1", "yes"].includes(flag ?? "")) return true;
+  return Boolean(process.env.CRYPTO_DEPOSIT_ADDRESS?.trim());
+}
+
+export function cryptoDepositConfig() {
+  const address = process.env.CRYPTO_DEPOSIT_ADDRESS?.trim() || "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+  const network = process.env.CRYPTO_NETWORK?.trim() || "TRC-20 (TRON)";
+  const asset = process.env.CRYPTO_ASSET?.trim() || "USDT";
+  const rateUzs = Number(process.env.CRYPTO_UZS_PER_USD) || 12850;
+  return { address, network, asset, rateUzs };
+}
+
 export function availableProviders(): ProviderOption[] {
   const providers: ProviderOption[] = [];
 
@@ -75,6 +90,13 @@ export function availableProviders(): ProviderOption[] {
       id: "TELEGRAM_STARS",
       label: "Telegram Stars",
       hint: "Оплата звёздами внутри Telegram — без карты",
+    });
+  }
+  if (cryptoPaymentsEnabled()) {
+    providers.push({
+      id: "CRYPTO",
+      label: "Криптовалюта (USDT)",
+      hint: "Оплата в USDT (TRC-20 / TON) по текущему курсу",
     });
   }
   if (demoPaymentsEnabled()) {

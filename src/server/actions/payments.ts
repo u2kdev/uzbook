@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { businesses } from "@/server/db/schema";
+import { businesses, payments } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { planById, type PlanId } from "@/lib/plans";
 import {
@@ -110,6 +110,59 @@ export async function confirmDemoPaymentAction(
     externalId,
     providerTxnId: `demo-${Date.now()}`,
     payload: { demo: true },
+  });
+
+  if (!result.ok) return { error: result.error };
+
+  refreshBilling(business.slug);
+  return { ok: true, plan: result.payment.plan };
+}
+
+export async function confirmCryptoPaymentAction(
+  externalId: string,
+  txHash: string,
+): Promise<PaymentActionState> {
+  const { business, db } = await ownerBusiness();
+  if (!business) return { error: "Сначала создайте бизнес" };
+
+  const cleanHash = txHash?.trim();
+  if (!cleanHash || cleanHash.length < 8) {
+    return { error: "Укажите корректный хеш транзакции (TXID)" };
+  }
+
+  const row = await getPaymentByExternalId(externalId);
+  if (!row || row.business.id !== business.id) {
+    return { error: "Платёж не найден" };
+  }
+  if (row.payment.provider !== "CRYPTO") {
+    return { error: "Платёж оформлен через другой способ оплаты" };
+  }
+  if (row.payment.status === "PAID") {
+    return { ok: true, plan: row.payment.plan };
+  }
+  if (row.payment.status === "CANCELLED" || row.payment.status === "FAILED") {
+    return { error: "Платёж отменён. Создайте новый в разделе «Оплата»." };
+  }
+
+  // Idempotency: verify this transaction hash hasn't been used on any other payment
+  const [duplicateTx] = await db
+    .select({ id: payments.id })
+    .from(payments)
+    .where(and(eq(payments.providerTxnId, cleanHash), ne(payments.id, row.payment.id)))
+    .limit(1);
+
+  if (duplicateTx) {
+    return { error: "Этот хеш транзакции уже был использован ранее" };
+  }
+
+  const result = await completePayment({
+    externalId,
+    providerTxnId: cleanHash,
+    payload: {
+      ...(row.payment.payload ?? {}),
+      txHash: cleanHash,
+      confirmedAt: new Date().toISOString(),
+    },
   });
 
   if (!result.ok) return { error: result.error };

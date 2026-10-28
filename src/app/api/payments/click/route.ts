@@ -7,6 +7,8 @@ import {
   getPaymentByExternalId,
   markPaymentPending,
 } from "@/server/payments/service";
+import { sanitizePaymentPayload, trackWebhookFailure } from "@/server/payments/security";
+import { logger } from "@/server/logger";
 import { revalidatePath } from "next/cache";
 
 export const runtime = "nodejs";
@@ -57,11 +59,13 @@ export async function POST(request: Request) {
 
   const ip = clientIp(request);
   if (!isIpAllowed(ip, process.env.CLICK_IP_ALLOWLIST)) {
+    trackWebhookFailure("click", "ip_not_allowed", ip);
     return Response.json({ error: -1, error_note: "IP not allowed" }, { status: 403 });
   }
 
   const limit = rateLimit(`click:${ip}`, 120, 60_000);
   if (!limit.ok) {
+    trackWebhookFailure("click", "rate_limit_exceeded", ip);
     return Response.json(
       { error: -1, error_note: "Too many requests" },
       {
@@ -77,6 +81,7 @@ export async function POST(request: Request) {
   try {
     form = await request.formData();
   } catch {
+    trackWebhookFailure("click", "form_parse_error", ip);
     return reply({ error: -8, error_note: "Bad request" });
   }
 
@@ -91,6 +96,15 @@ export async function POST(request: Request) {
   const merchantPrepareId = String(form.get("merchant_prepare_id") ?? "");
   const clickPaydocId = String(form.get("click_paydoc_id") ?? "");
 
+  const formEntries: Record<string, unknown> = {};
+  for (const [key, val] of form.entries()) {
+    formEntries[key] = val;
+  }
+  logger.info("click.webhook_request", {
+    action,
+    payload: sanitizePaymentPayload(formEntries),
+  });
+
   if (
     !clickTransId ||
     !merchantTransId ||
@@ -99,10 +113,12 @@ export async function POST(request: Request) {
     !signTime ||
     !signString
   ) {
+    trackWebhookFailure("click", "missing_parameters", ip);
     return reply({ error: -2, error_note: "Missing parameters" });
   }
 
   if (serviceId !== config.serviceId) {
+    trackWebhookFailure("click", "unknown_service", ip);
     return reply({ error: -2, error_note: "Unknown service" });
   }
 
@@ -116,6 +132,7 @@ export async function POST(request: Request) {
     signTime,
   });
   if (expectedSign.toLowerCase() !== signString.toLowerCase()) {
+    trackWebhookFailure("click", "invalid_signature", ip);
     return reply({ error: -1, error_note: "Invalid sign" });
   }
 
