@@ -227,7 +227,7 @@ export function TelegramWebAppProvider({ children }: { children: React.ReactNode
     >
       <Script
         src="https://telegram.org/js/telegram-web-app.js"
-        strategy="beforeInteractive"
+        strategy="afterInteractive"
         onLoad={initTelegram}
       />
       {children}

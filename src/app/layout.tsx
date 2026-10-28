@@ -30,8 +30,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru" className={`${onest.variable} ${cormorant.variable}`}>
-      <body>
+    <html lang="ru" className={`${onest.variable} ${cormorant.variable}`} suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <TelegramWebAppProvider>{children}</TelegramWebAppProvider>
       </body>
     </html>

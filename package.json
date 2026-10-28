@@ -13,6 +13,7 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed.ts",
     "db:sync": "tsx scripts/sync-migrations.ts",
+    "db:reset-passwords": "tsx scripts/reset-test-passwords.ts",
     "admin:create": "tsx scripts/create-admin.ts",
     "maintenance": "tsx scripts/maintenance.ts",
     "bot": "tsx bot/index.ts",
