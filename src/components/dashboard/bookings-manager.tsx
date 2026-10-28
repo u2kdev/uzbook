@@ -6,12 +6,16 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowUpRight,
+  Calendar,
+  CalendarClock,
   CalendarDays,
   Check,
   CheckCheck,
   ChevronRight,
   Clock3,
   Copy,
+  History,
+  List,
   Loader2,
   Phone,
   Plus,
@@ -21,10 +25,15 @@ import {
 } from "lucide-react";
 import {
   createManualBookingAction,
+  getClientHistoryAction,
+  ownerRescheduleBookingAction,
   setBookingStatus,
+  type ClientHistory,
   type ManualBookingState,
 } from "@/server/actions/bookings";
 import { formatMoney } from "@/lib/plans";
+import { fromZonedTime } from "date-fns-tz";
+import { WeekCalendar } from "@/components/dashboard/week-calendar";
 
 type BookingRow = {
   id: string;
@@ -127,9 +136,21 @@ export function BookingsManager({
   staff: StaffOption[];
 }) {
   const router = useRouter();
+  const [viewMode, setViewMode] = useState<"list" | "week">("list");
   const [tab, setTab] = useState<"upcoming" | "today" | "cancelled" | "all">("upcoming");
+  const [staffFilter, setStaffFilter] = useState<string>("all");
+  const [serviceFilter, setServiceFilter] = useState<string>("all");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<BookingRow | null>(null);
+  const [clientHistory, setClientHistory] = useState<ClientHistory | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [cancelPrompt, setCancelPrompt] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState(today);
+  const [rescheduleTime, setRescheduleTime] = useState("10:00");
+  const [rescheduleStaffId, setRescheduleStaffId] = useState("");
+  const [rescheduleError, setRescheduleError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -138,6 +159,9 @@ export function BookingsManager({
     const search = query.trim().toLowerCase();
     return bookings
       .filter((booking) => {
+        if (staffFilter !== "all" && booking.staffId !== staffFilter) return false;
+        if (serviceFilter !== "all" && booking.serviceId !== serviceFilter) return false;
+
         if (tab === "upcoming") {
           return (
             new Date(booking.endAt).getTime() >= now &&
@@ -154,7 +178,8 @@ export function BookingsManager({
           booking.clientName.toLowerCase().includes(search) ||
           booking.clientPhone.includes(search) ||
           booking.serviceName.toLowerCase().includes(search) ||
-          booking.staffName.toLowerCase().includes(search)
+          booking.staffName.toLowerCase().includes(search) ||
+          (booking.note && booking.note.toLowerCase().includes(search))
         );
       })
       .sort((a, b) =>
@@ -162,7 +187,7 @@ export function BookingsManager({
           ? new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
           : new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
       );
-  }, [bookings, tab, query, timezone, today]);
+  }, [bookings, tab, staffFilter, serviceFilter, query, timezone, today]);
 
   const groups = useMemo(() => {
     const map = new Map<string, BookingRow[]>();
@@ -175,12 +200,51 @@ export function BookingsManager({
     return [...map.entries()];
   }, [filtered, timezone]);
 
-  function act(booking: BookingRow, status: "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW") {
+  async function handleOpenDetails(b: BookingRow) {
+    setSelected(b);
+    setCancelPrompt(false);
+    setCancelReason("");
+    setRescheduleOpen(false);
+    setRescheduleError(null);
+    setRescheduleDate(dateKey(b.startAt, timezone));
+    setRescheduleTime(timeLabel(b.startAt, timezone));
+    setRescheduleStaffId(b.staffId);
+    setLoadingHistory(true);
+    try {
+      const h = await getClientHistoryAction(b.clientPhone);
+      setClientHistory(h);
+    } catch {
+      setClientHistory(null);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
+
+  function act(booking: BookingRow, status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW", reason?: string) {
     startTransition(async () => {
-      await setBookingStatus(booking.id, status);
+      await setBookingStatus(booking.id, status, reason);
       setSelected(null);
+      setCancelPrompt(false);
+      setCancelReason("");
       router.refresh();
     });
+  }
+
+  async function handleReschedule(bookingId: string, newStartAt: string, newStaffId?: string) {
+    const res = await ownerRescheduleBookingAction({
+      bookingId,
+      startAt: newStartAt,
+      staffId: newStaffId,
+    });
+    if (res.ok) {
+      router.refresh();
+      setSelected(null);
+      setRescheduleOpen(false);
+      setRescheduleError(null);
+    } else {
+      setRescheduleError(res.error || "Не удалось перенести запись");
+    }
+    return res;
   }
 
   const manageUrl = selected ? `${appUrl}/b/${selected.manageToken}` : "";
@@ -193,43 +257,96 @@ export function BookingsManager({
             Журнал
           </p>
           <h1 className="mt-1.5 text-[26px] leading-tight font-semibold tracking-[-0.03em]">
-            Записи
+            Записи и календарь
           </h1>
           <p className="mt-1 text-[12.5px] text-muted">
-            Все брони за последние 2 недели и вперёд. Клиент может перенести сам.
+            Управление записями, недельный календарь с переносом и история визитов клиентов.
           </p>
         </div>
-        <button
-          onClick={() => setCreating(true)}
-          className="btn btn-primary h-10 text-[12.5px]"
-        >
-          <Plus size={15} strokeWidth={1.8} /> Новая запись
-        </button>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap items-center gap-1 rounded-full border border-line bg-white p-1">
-          {(
-            [
-              ["upcoming", "Предстоящие"],
-              ["today", "Сегодня"],
-              ["cancelled", "Отменённые"],
-              ["all", "Все"],
-            ] as const
-          ).map(([value, label]) => (
+        <div className="flex items-center gap-2">
+          {/* View mode switch */}
+          <div className="flex items-center rounded-xl border border-line bg-white p-1">
             <button
-              key={value}
-              onClick={() => setTab(value)}
-              className={`rounded-full px-3 py-1.5 text-[11.5px] font-medium transition-colors ${
-                tab === value ? "bg-ink text-white" : "text-muted hover:text-ink"
+              onClick={() => setViewMode("list")}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
+                viewMode === "list" ? "bg-ink text-white" : "text-muted hover:text-ink"
               }`}
             >
-              {label}
+              <List size={14} /> Список
             </button>
-          ))}
-        </div>
+            <button
+              onClick={() => setViewMode("week")}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium transition-colors ${
+                viewMode === "week" ? "bg-ink text-white" : "text-muted hover:text-ink"
+              }`}
+            >
+              <Calendar size={14} /> Неделя
+            </button>
+          </div>
 
-        <label className="ml-auto flex h-10 w-full items-center gap-2 rounded-full border border-line bg-white px-3.5 sm:w-64">
+          <button
+            onClick={() => setCreating(true)}
+            className="btn btn-primary h-10 text-[12.5px]"
+          >
+            <Plus size={15} strokeWidth={1.8} /> Новая запись
+          </button>
+        </div>
+      </div>
+
+      {/* Filters bar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {viewMode === "list" && (
+          <div className="flex flex-wrap items-center gap-1 rounded-full border border-line bg-white p-1">
+            {(
+              [
+                ["upcoming", "Предстоящие"],
+                ["today", "Сегодня"],
+                ["cancelled", "Отменённые"],
+                ["all", "Все"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                onClick={() => setTab(value)}
+                className={`rounded-full px-3 py-1.5 text-[11.5px] font-medium transition-colors ${
+                  tab === value ? "bg-ink text-white" : "text-muted hover:text-ink"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Staff filter */}
+        <select
+          value={staffFilter}
+          onChange={(e) => setStaffFilter(e.target.value)}
+          className="h-10 rounded-full border border-line bg-white px-3 text-[12px] text-ink outline-none"
+        >
+          <option value="all">Все мастера ({staff.length})</option>
+          {staff.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+
+        {/* Service filter */}
+        <select
+          value={serviceFilter}
+          onChange={(e) => setServiceFilter(e.target.value)}
+          className="h-10 rounded-full border border-line bg-white px-3 text-[12px] text-ink outline-none"
+        >
+          <option value="all">Все услуги ({services.length})</option>
+          {services.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+
+        <label className="ml-auto flex h-10 w-full items-center gap-2 rounded-full border border-line bg-white px-3.5 sm:w-60">
           <Search size={14} strokeWidth={1.7} className="text-muted" />
           <input
             value={query}
@@ -245,7 +362,17 @@ export function BookingsManager({
         </label>
       </div>
 
-      {filtered.length === 0 ? (
+      {viewMode === "week" ? (
+        <WeekCalendar
+          bookings={filtered}
+          staff={staff}
+          timezone={timezone}
+          currency={currency}
+          today={today}
+          onSelectBooking={handleOpenDetails}
+          onReschedule={handleReschedule}
+        />
+      ) : filtered.length === 0 ? (
         <div className="rounded-[24px] border border-dashed border-line bg-white/60 px-6 py-14 text-center">
           <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-brand-soft text-brand">
             <CalendarDays size={20} strokeWidth={1.5} />
@@ -277,7 +404,7 @@ export function BookingsManager({
                 {list.map((booking, index) => (
                   <button
                     key={booking.id}
-                    onClick={() => setSelected(booking)}
+                    onClick={() => handleOpenDetails(booking)}
                     className={`flex w-full flex-wrap items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-paper/60 ${
                       index > 0 ? "border-t border-line/70" : ""
                     } ${booking.status === "CANCELLED" ? "opacity-60" : ""}`}
@@ -334,19 +461,24 @@ export function BookingsManager({
         </div>
       )}
 
-      {/* Details */}
+      {/* Details Drawer */}
       {selected && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 backdrop-blur-sm sm:items-center sm:p-6">
-          <div className="w-full max-w-md rounded-t-[28px] bg-white p-5 shadow-lift sm:rounded-[28px] sm:p-6">
+          <div className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-[28px] bg-white p-5 shadow-lift sm:rounded-[28px] sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span
-                  className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
-                    STATUS_STYLE[selected.status] ?? "bg-paper text-muted"
-                  }`}
-                >
-                  {STATUS_LABEL[selected.status] ?? selected.status}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                      STATUS_STYLE[selected.status] ?? "bg-paper text-muted"
+                    }`}
+                  >
+                    {STATUS_LABEL[selected.status] ?? selected.status}
+                  </span>
+                  <span className="rounded-full bg-paper px-2 py-0.5 text-[10px] font-medium text-muted">
+                    {SOURCE_LABEL[selected.source] ?? selected.source}
+                  </span>
+                </div>
                 <h2 className="mt-3 text-[19px] leading-tight font-semibold">
                   {selected.clientName}
                 </h2>
@@ -363,6 +495,7 @@ export function BookingsManager({
               </button>
             </div>
 
+            {/* Time and Price Card */}
             <div className="mt-4 rounded-xl bg-paper px-3.5 py-3">
               <p className="text-[12.5px] font-semibold">
                 {new Intl.DateTimeFormat("ru-RU", {
@@ -378,6 +511,39 @@ export function BookingsManager({
               </p>
             </div>
 
+            {/* Client History Card */}
+            <div className="mt-3 rounded-xl border border-line bg-paper/40 p-3 text-[11.5px]">
+              <div className="flex items-center justify-between text-muted">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <History size={13} /> История клиента
+                </span>
+                {loadingHistory && <Loader2 size={12} className="animate-spin" />}
+              </div>
+              {clientHistory ? (
+                <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-lg bg-white p-2 ring-1 ring-line/60">
+                    <p className="text-[14px] font-bold text-ink">{clientHistory.totalVisits}</p>
+                    <p className="text-[10px] text-muted">всего визитов</p>
+                  </div>
+                  <div className="rounded-lg bg-white p-2 ring-1 ring-line/60">
+                    <p className="text-[14px] font-bold text-mint">{clientHistory.completedVisits}</p>
+                    <p className="text-[10px] text-muted">завершено</p>
+                  </div>
+                  <div className="rounded-lg bg-white p-2 ring-1 ring-line/60">
+                    <p className="text-[14px] font-bold text-rose">{clientHistory.cancelledVisits + clientHistory.noShowVisits}</p>
+                    <p className="text-[10px] text-muted">отмен / неявок</p>
+                  </div>
+                  <div className="col-span-3 mt-1 flex items-center justify-between px-1 text-[11px] text-muted">
+                    <span>Сумма покупок:</span>
+                    <span className="font-semibold text-ink">{formatMoney(clientHistory.totalSpent, currency)}</span>
+                  </div>
+                </div>
+              ) : !loadingHistory ? (
+                <p className="mt-1 text-muted">Первый визит клиента в салон</p>
+              ) : null}
+            </div>
+
+            {/* Contact & Links */}
             <div className="mt-3 space-y-2">
               <a
                 href={`tel:${selected.clientPhone}`}
@@ -388,7 +554,7 @@ export function BookingsManager({
               </a>
               {selected.note && (
                 <div className="rounded-xl border border-line px-3.5 py-2.5 text-[12px] leading-relaxed text-muted">
-                  {selected.note}
+                  «{selected.note}»
                 </div>
               )}
               <button
@@ -409,43 +575,157 @@ export function BookingsManager({
               </Link>
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-2">
-              {selected.status === "PENDING" && (
+            {/* Reschedule Section */}
+            <div className="mt-4 border-t border-line pt-3">
+              {!rescheduleOpen ? (
                 <button
-                  onClick={() => act(selected, "CONFIRMED")}
-                  disabled={pending}
-                  className="btn btn-accent col-span-2 h-10 text-[12px]"
+                  type="button"
+                  onClick={() => setRescheduleOpen(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-line py-2 text-[12px] font-medium text-ink hover:bg-paper"
                 >
-                  {pending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  Подтвердить
+                  <CalendarClock size={14} /> Перенести запись на другое время
                 </button>
+              ) : (
+                <div className="rounded-xl border border-brand/20 bg-brand/5 p-3 text-[12px]">
+                  <p className="font-semibold text-brand-dark">Перенос записи:</p>
+                  {rescheduleError && (
+                    <div className="mt-2 rounded-lg bg-rose/10 px-2.5 py-1.5 text-[11.5px] text-rose">
+                      {rescheduleError}
+                    </div>
+                  )}
+                  <div className="mt-2.5 space-y-2">
+                    <div>
+                      <label className="text-[11px] text-muted">Дата:</label>
+                      <input
+                        type="date"
+                        value={rescheduleDate}
+                        onChange={(e) => setRescheduleDate(e.target.value)}
+                        className="input-base mt-1 h-9 text-[12px]"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[11px] text-muted">Время:</label>
+                        <input
+                          type="time"
+                          value={rescheduleTime}
+                          onChange={(e) => setRescheduleTime(e.target.value)}
+                          className="input-base mt-1 h-9 text-[12px]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-muted">Мастер:</label>
+                        <select
+                          value={rescheduleStaffId}
+                          onChange={(e) => setRescheduleStaffId(e.target.value)}
+                          className="input-base mt-1 h-9 text-[12px]"
+                        >
+                          {staff.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setRescheduleOpen(false)}
+                        className="btn btn-ghost h-8 text-[11px]"
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => {
+                          const newIso = `${rescheduleDate}T${rescheduleTime}:00`;
+                          const instant = fromZonedTime(newIso, timezone);
+                          startTransition(async () => {
+                            await handleReschedule(selected.id, instant.toISOString(), rescheduleStaffId);
+                          });
+                        }}
+                        className="btn btn-primary h-8 text-[11px]"
+                      >
+                        {pending ? <Loader2 size={12} className="animate-spin" /> : "Сохранить"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
-              {selected.status === "CONFIRMED" && (
-                <>
+            </div>
+
+            {/* Status actions */}
+            <div className="mt-4 border-t border-line pt-3">
+              <div className="grid grid-cols-2 gap-2">
+                {selected.status === "PENDING" && (
                   <button
-                    onClick={() => act(selected, "COMPLETED")}
+                    onClick={() => act(selected, "CONFIRMED")}
                     disabled={pending}
-                    className="btn btn-primary h-10 text-[12px]"
+                    className="btn btn-primary col-span-2 h-10 text-[12px]"
                   >
-                    <CheckCheck size={14} /> Пришёл
+                    {pending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    Подтвердить
                   </button>
+                )}
+                {selected.status === "CONFIRMED" && (
+                  <>
+                    <button
+                      onClick={() => act(selected, "COMPLETED")}
+                      disabled={pending}
+                      className="btn btn-primary h-10 text-[12px]"
+                    >
+                      <CheckCheck size={14} /> Пришёл
+                    </button>
+                    <button
+                      onClick={() => act(selected, "NO_SHOW")}
+                      disabled={pending}
+                      className="btn btn-ghost h-10 text-[12px]"
+                    >
+                      <UserX size={14} /> Не пришёл
+                    </button>
+                  </>
+                )}
+                {selected.status !== "CANCELLED" && !cancelPrompt && (
                   <button
-                    onClick={() => act(selected, "NO_SHOW")}
+                    onClick={() => setCancelPrompt(true)}
                     disabled={pending}
-                    className="btn btn-ghost h-10 text-[12px]"
+                    className="btn btn-ghost col-span-2 h-10 border-rose/20 text-[12px] text-rose hover:bg-rose/5"
                   >
-                    <UserX size={14} /> Не пришёл
+                    Отменить запись
                   </button>
-                </>
-              )}
-              {selected.status !== "CANCELLED" && selected.status !== "COMPLETED" && (
-                <button
-                  onClick={() => act(selected, "CANCELLED")}
-                  disabled={pending}
-                  className="btn btn-ghost col-span-2 h-10 border-rose/20 text-[12px] text-rose hover:bg-rose/5"
-                >
-                  Отменить запись
-                </button>
+                )}
+              </div>
+
+              {cancelPrompt && (
+                <div className="mt-2.5 rounded-xl border border-rose/20 bg-rose/5 p-3 text-[12px]">
+                  <p className="font-semibold text-rose">Причина отмены:</p>
+                  <input
+                    type="text"
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    placeholder="Клиент попросил отменить, мастер заболел..."
+                    className="input-base mt-2 text-[12px]"
+                  />
+                  <div className="mt-2.5 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCancelPrompt(false)}
+                      className="btn btn-ghost h-8 text-[11px]"
+                    >
+                      Назад
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => act(selected, "CANCELLED", cancelReason)}
+                      className="btn btn-primary h-8 bg-rose text-[11px] hover:bg-rose/90"
+                    >
+                      {pending ? <Loader2 size={12} className="animate-spin" /> : "Подтвердить отмену"}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           </div>
