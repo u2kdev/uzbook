@@ -79,6 +79,13 @@ export type BusinessSettings = {
   autoConfirm: boolean;
   showPrices: boolean;
   requireEmail: boolean;
+  telegramNotifications?: {
+    newBooking?: boolean;
+    cancelled?: boolean;
+    rescheduled?: boolean;
+    payment?: boolean;
+    digest?: boolean;
+  };
 };
 
 export type BusinessTheme = {

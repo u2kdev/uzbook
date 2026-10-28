@@ -47,8 +47,12 @@ function money(amount: number, currency: string) {
   }
 }
 
-function cabinetKeyboard() {
-  return new InlineKeyboard().url("Открыть кабинет", `${appUrl}/dashboard`);
+function ownerKeyboard(slug?: string | null) {
+  const kb = new InlineKeyboard().url("Открыть кабинет", `${appUrl}/dashboard`);
+  if (slug) {
+    kb.row().url("Страница записи", `${appUrl}/${slug}`);
+  }
+  return kb;
 }
 
 async function ownerBusiness(telegramId: string) {
@@ -98,9 +102,10 @@ bot.command("start", async (ctx) => {
       return;
     }
 
+    const business = await ownerBusiness(String(ctx.from.id));
     await ctx.reply(
-      `Готово, ${user.name}! Уведомления о новых записях будут приходить сюда.\n\nКоманды:\n/today — записи на сегодня\n/help — помощь`,
-      { reply_markup: cabinetKeyboard() },
+      `Готово, ${user.name}! Уведомления о новых записях будут приходить сюда.\n\nКоманды:\n/today — записи на сегодня\n/help — помощь\n/unlink — отвязать Telegram`,
+      { reply_markup: ownerKeyboard(business?.slug) },
     );
     return;
   }
@@ -108,8 +113,8 @@ bot.command("start", async (ctx) => {
   const business = await ownerBusiness(String(ctx.from.id));
   if (business) {
     await ctx.reply(
-      `С возвращением! Это бот uzbook.\n\n/today — записи на сегодня\n/help — помощь`,
-      { reply_markup: cabinetKeyboard() },
+      `С возвращением! Это бот uzbook.\n\n/today — записи на сегодня\n/help — помощь\n/unlink — отвязать Telegram`,
+      { reply_markup: ownerKeyboard(business.slug) },
     );
     return;
   }
@@ -131,7 +136,7 @@ bot.command("today", async (ctx) => {
   if (!business) {
     await ctx.reply(
       "Не вижу ваш бизнес. Войдите в кабинет и создайте страницу, затем привяжите Telegram заново.",
-      { reply_markup: cabinetKeyboard() },
+      { reply_markup: ownerKeyboard() },
     );
     return;
   }
@@ -177,19 +182,38 @@ bot.command("today", async (ctx) => {
 });
 
 bot.command("help", async (ctx) => {
+  const business = ctx.from ? await ownerBusiness(String(ctx.from.id)) : null;
   await ctx.reply(
     [
-      "uzbook — запись клиентов без переписок.",
+      "uzbook — онлайн-запись клиентов без переписок и звонков.",
       "",
-      "Что умеет бот:",
-      "• присылает уведомление о новой записи, отмене и переносе;",
-      "• /today — короткая сводка на сегодня;",
-      "• ссылка на кабинет и страницу записи.",
+      "Доступные команды:",
+      "• /today — список записей и ожидаемая выручка на сегодня",
+      "• /help — список возможностей и контакты поддержки",
+      "• /unlink — отвязать Telegram от кабинета uzbook",
       "",
-      `Страница записи: ${appUrl}`,
+      "Уведомления приходят автоматически при:",
+      "✓ новой записи клиента",
+      "✓ отмене или переносе времени",
+      "✓ подтверждении тарифа или напоминании об окончании",
+      "",
       `Поддержка: hello@uzbook.online`,
     ].join("\n"),
-    { reply_markup: cabinetKeyboard() },
+    { reply_markup: ownerKeyboard(business?.slug) },
+  );
+});
+
+bot.command("unlink", async (ctx) => {
+  if (!ctx.from) return;
+  const db = await getDb();
+  await db
+    .update(users)
+    .set({ telegramId: null })
+    .where(eq(users.telegramId, String(ctx.from.id)));
+
+  await ctx.reply(
+    "Ваш Telegram-аккаунт успешно отвязан от uzbook. Чтобы подключить его снова, откройте страницу салона в кабинете и нажмите «Подключить Telegram».",
+    { reply_markup: ownerKeyboard() },
   );
 });
 
@@ -245,7 +269,7 @@ bot.on("message:successful_payment", async (ctx) => {
       "ru-RU",
       { day: "numeric", month: "long", year: "numeric" },
     ).format(result.periodEnd)}.`,
-    { reply_markup: cabinetKeyboard() },
+    { reply_markup: ownerKeyboard() },
   );
 });
 
@@ -256,7 +280,8 @@ bot.catch((error) => {
 async function main() {
   await bot.api.setMyCommands([
     { command: "today", description: "Записи на сегодня" },
-    { command: "help", description: "Помощь" },
+    { command: "help", description: "Помощь и команды" },
+    { command: "unlink", description: "Отвязать аккаунт" },
   ]);
 
   console.log("uzbook bot started (long polling)");

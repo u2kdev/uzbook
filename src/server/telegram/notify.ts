@@ -151,6 +151,8 @@ export async function notifyNewBooking(bookingId: string) {
   try {
     const ctx = await loadBookingContext(bookingId);
     if (!ctx?.ownerTelegramId) return;
+    if (ctx.business.settings.telegramNotifications?.newBooking === false) return;
+
     await sendTelegramMessage(
       ctx.ownerTelegramId,
       bookingCard(ctx, `Новая запись · ${escapeHtml(ctx.business.name)}`),
@@ -165,6 +167,8 @@ export async function notifyBookingCancelled(bookingId: string) {
   try {
     const ctx = await loadBookingContext(bookingId);
     if (!ctx?.ownerTelegramId) return;
+    if (ctx.business.settings.telegramNotifications?.cancelled === false) return;
+
     await sendTelegramMessage(
       ctx.ownerTelegramId,
       bookingCard(ctx, `Клиент отменил запись · ${escapeHtml(ctx.business.name)}`),
@@ -179,6 +183,8 @@ export async function notifyBookingRescheduled(bookingId: string) {
   try {
     const ctx = await loadBookingContext(bookingId);
     if (!ctx?.ownerTelegramId) return;
+    if (ctx.business.settings.telegramNotifications?.rescheduled === false) return;
+
     await sendTelegramMessage(
       ctx.ownerTelegramId,
       bookingCard(ctx, `Запись перенесена · ${escapeHtml(ctx.business.name)}`),
@@ -188,3 +194,107 @@ export async function notifyBookingRescheduled(bookingId: string) {
     console.error("notifyBookingRescheduled failed", error);
   }
 }
+
+export async function notifyPaymentCompleted({
+  businessId,
+  plan,
+  amount,
+  currency = "UZS",
+  provider,
+  periodEnd,
+}: {
+  businessId: string;
+  plan: string;
+  amount: number;
+  currency?: string;
+  provider: string;
+  periodEnd: Date;
+}) {
+  try {
+    const db = await getDb();
+    const [row] = await db
+      .select({
+        businessName: businesses.name,
+        telegramId: users.telegramId,
+        settings: businesses.settings,
+      })
+      .from(businesses)
+      .innerJoin(users, eq(businesses.ownerId, users.id))
+      .where(eq(businesses.id, businessId))
+      .limit(1);
+
+    if (!row?.telegramId) return;
+    if (row.settings.telegramNotifications?.payment === false) return;
+
+    const formattedDate = new Intl.DateTimeFormat("ru-RU", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(periodEnd);
+
+    const text = [
+      `<b>⭐ Оплата получена · ${escapeHtml(row.businessName)}</b>`,
+      "",
+      `Тариф: <b>${escapeHtml(plan)}</b>`,
+      `Сумма: <b>${formatMoney(amount, currency)}</b>`,
+      `Способ: <b>${escapeHtml(provider)}</b>`,
+      `Подписка активна до: <b>${formattedDate}</b>`,
+      "",
+      "Все лимиты обновлены. Спасибо, что вы с нами!",
+    ].join("\n");
+
+    const buttons = [
+      [
+        { text: "Открыть кабинет", url: `${appUrl()}/dashboard` },
+        { text: "Тариф и лимиты", url: `${appUrl()}/dashboard/billing` },
+      ],
+    ];
+
+    await sendTelegramMessage(row.telegramId, text, buttons);
+  } catch (error) {
+    console.error("notifyPaymentCompleted failed", error);
+  }
+}
+
+export async function notifySubscriptionExpiring({
+  businessId,
+  daysLeft,
+  isTrial,
+}: {
+  businessId: string;
+  daysLeft: number;
+  isTrial: boolean;
+}) {
+  try {
+    const db = await getDb();
+    const [row] = await db
+      .select({
+        businessName: businesses.name,
+        telegramId: users.telegramId,
+      })
+      .from(businesses)
+      .innerJoin(users, eq(businesses.ownerId, users.id))
+      .where(eq(businesses.id, businessId))
+      .limit(1);
+
+    if (!row?.telegramId) return;
+
+    const term = isTrial ? "пробного периода" : "оплаченного тарифа";
+    const text = [
+      `<b>⚠️ Напоминание · ${escapeHtml(row.businessName)}</b>`,
+      "",
+      `До окончания ${term} осталось <b>${daysLeft} дн.</b>`,
+      "",
+      "Продлите тариф вовремя, чтобы онлайн-запись не приостанавливалась, а мастера и услуги оставались активными.",
+    ].join("\n");
+
+    const buttons = [
+      [{ text: "Продлить тариф", url: `${appUrl()}/dashboard/billing` }],
+    ];
+
+    await sendTelegramMessage(row.telegramId, text, buttons);
+  } catch (error) {
+    console.error("notifySubscriptionExpiring failed", error);
+  }
+}
+

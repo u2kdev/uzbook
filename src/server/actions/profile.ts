@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/server/db";
-import { businesses, subscriptions, type BusinessSettings } from "@/server/db/schema";
+import { businesses, subscriptions, users, type BusinessSettings } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { isValidSlug, slugify } from "@/lib/slug";
 import { planById, type PlanId } from "@/lib/plans";
@@ -211,3 +211,43 @@ export async function cancelPlanRequestAction(subscriptionId: string): Promise<B
   revalidatePath("/dashboard/billing");
   return { ok: true };
 }
+
+export async function unlinkTelegramAction(): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireUser();
+  if (session.role !== "OWNER") return { ok: false, error: "Нет доступа" };
+
+  const db = await getDb();
+  await db.update(users).set({ telegramId: null }).where(eq(users.id, session.id));
+
+  revalidatePath("/dashboard/profile");
+  return { ok: true };
+}
+
+export async function updateTelegramNotificationSettingsAction(settings: {
+  newBooking?: boolean;
+  cancelled?: boolean;
+  rescheduled?: boolean;
+  payment?: boolean;
+  digest?: boolean;
+}): Promise<{ ok: boolean; error?: string }> {
+  const { business, db } = await myBusiness();
+  if (!business) return { ok: false, error: "Нет доступа" };
+
+  const currentSettings = business.settings;
+  const updated: BusinessSettings = {
+    ...currentSettings,
+    telegramNotifications: {
+      ...currentSettings.telegramNotifications,
+      ...settings,
+    },
+  };
+
+  await db
+    .update(businesses)
+    .set({ settings: updated })
+    .where(eq(businesses.id, business.id));
+
+  revalidatePath("/dashboard/profile");
+  return { ok: true };
+}
+

@@ -6,6 +6,7 @@ import { getDb } from "@/server/db";
 import { businesses, subscriptions, users } from "@/server/db/schema";
 import { requireAdmin } from "@/server/auth/session";
 import { planById, type PlanId } from "@/lib/plans";
+import { notifyPaymentCompleted } from "@/server/telegram/notify";
 
 export type AdminState = { ok?: boolean; error?: string } | null;
 
@@ -114,6 +115,7 @@ export async function approveSubscriptionAction(subscriptionId: string): Promise
   const plan = planById(subscription.plan);
   const now = new Date();
 
+  let finalPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   await db.transaction(async (tx) => {
     const [active] = await tx
       .select()
@@ -132,6 +134,7 @@ export async function approveSubscriptionAction(subscriptionId: string): Promise
         ? active.currentPeriodEnd
         : now;
     const periodEnd = new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000);
+    finalPeriodEnd = periodEnd;
 
     await tx
       .update(subscriptions)
@@ -171,6 +174,15 @@ export async function approveSubscriptionAction(subscriptionId: string): Promise
       .update(businesses)
       .set({ plan: subscription.plan, trialEndsAt: null })
       .where(eq(businesses.id, subscription.businessId));
+  });
+
+  void notifyPaymentCompleted({
+    businessId: subscription.businessId,
+    plan: plan.name,
+    amount: plan.priceUzs,
+    currency: "UZS",
+    provider: "MANUAL",
+    periodEnd: finalPeriodEnd,
   });
 
   refresh();

@@ -71,7 +71,12 @@ export function PageEditor({
   publicUrl: string;
   servicesCount: number;
   staffCount: number;
-  telegram: { configured: boolean; link: string | null };
+  telegram: {
+    configured: boolean;
+    link: string | null;
+    connected?: boolean;
+    telegramId?: string | null;
+  };
   sections: PageSection[];
   galleryImages: GalleryImage[];
 }) {

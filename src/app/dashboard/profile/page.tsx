@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm";
+import { getDb } from "@/server/db";
+import { users } from "@/server/db/schema";
 import { getMyBusiness } from "@/server/auth/session";
 import { createTelegramLinkToken, botUsername } from "@/server/telegram/link";
 import { telegramConfigured } from "@/server/telegram/notify";
@@ -13,12 +16,14 @@ export default async function ProfilePage() {
   const { session, business } = await getMyBusiness();
   if (!business) return null;
 
-  const [services, staff, linkToken, sections, gallery] = await Promise.all([
+  const db = await getDb();
+  const [services, staff, linkToken, sections, gallery, [userRow]] = await Promise.all([
     getOwnerServices(business.id),
     getOwnerStaff(business.id),
     createTelegramLinkToken(session.id),
     getSections(),
     listGalleryImages(),
+    db.select({ telegramId: users.telegramId }).from(users).where(eq(users.id, session.id)).limit(1),
   ]);
 
   const username = botUsername();
@@ -33,7 +38,12 @@ export default async function ProfilePage() {
       publicUrl={`${appUrl}/${business.slug}`}
       servicesCount={services.filter((service) => service.isActive).length}
       staffCount={staff.filter((member) => member.isActive).length}
-      telegram={{ configured: telegramConfigured(), link: telegramLink }}
+      telegram={{
+        configured: telegramConfigured(),
+        link: telegramLink,
+        connected: Boolean(userRow?.telegramId),
+        telegramId: userRow?.telegramId ?? null,
+      }}
       sections={sections.map((section) => ({
         ...section,
         config: (section.config ?? {}) as Record<string, unknown>,

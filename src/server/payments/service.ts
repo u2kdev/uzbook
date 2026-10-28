@@ -16,6 +16,7 @@ import {
   type PaymentProviderId,
 } from "./config";
 import { logger } from "@/server/logger";
+import { notifyPaymentCompleted } from "@/server/telegram/notify";
 
 const PERIOD_DAYS = 30;
 const PERIOD_MS = PERIOD_DAYS * 24 * 60 * 60 * 1000;
@@ -144,7 +145,7 @@ export async function completePayment(params: {
 > {
   const db = await getDb();
 
-  return db.transaction(async (tx) => {
+  const res = await db.transaction(async (tx) => {
     const [payment] = await tx
       .select()
       .from(payments)
@@ -255,6 +256,19 @@ export async function completePayment(params: {
       periodEnd,
     };
   });
+
+  if (res.ok && !res.alreadyPaid) {
+    void notifyPaymentCompleted({
+      businessId: res.business.id,
+      plan: res.payment.plan,
+      amount: res.payment.amount,
+      currency: res.payment.currency,
+      provider: res.payment.provider,
+      periodEnd: res.periodEnd,
+    });
+  }
+
+  return res;
 }
 
 export async function cancelPayment(params: {
