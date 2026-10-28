@@ -53,6 +53,7 @@ export async function createBooking(input: {
   email?: string | null;
   note?: string | null;
   source?: "WEB" | "TELEGRAM" | "MANUAL";
+  telegramId?: string | null;
 }): Promise<Result<{ id: string; manageToken: string; startAt: Date; endAt: Date }>> {
   const db = await getDb();
   const start = new Date(input.startAt);
@@ -135,10 +136,15 @@ export async function createBooking(input: {
           name: input.name.trim().slice(0, 120),
           phone,
           email: input.email?.trim() || null,
+          telegramId: input.telegramId ?? null,
         })
         .onConflictDoUpdate({
           target: [clients.businessId, clients.phone],
-          set: { name: input.name.trim().slice(0, 120), email: input.email?.trim() || null },
+          set: {
+            name: input.name.trim().slice(0, 120),
+            email: input.email?.trim() || null,
+            ...(input.telegramId ? { telegramId: input.telegramId } : {}),
+          },
         })
         .returning();
 

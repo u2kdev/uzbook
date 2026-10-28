@@ -48,9 +48,18 @@ function money(amount: number, currency: string) {
 }
 
 function ownerKeyboard(slug?: string | null) {
-  const kb = new InlineKeyboard().url("Открыть кабинет", `${appUrl}/dashboard`);
-  if (slug) {
-    kb.row().url("Страница записи", `${appUrl}/${slug}`);
+  const isHttps = appUrl.startsWith("https://");
+  const kb = new InlineKeyboard();
+  if (isHttps) {
+    kb.webApp("Кабинет (Mini App)", `${appUrl}/dashboard?tma=1`);
+    if (slug) {
+      kb.row().webApp("Страница записи", `${appUrl}/${slug}?tma=1`);
+    }
+  } else {
+    kb.url("Открыть кабинет", `${appUrl}/dashboard`);
+    if (slug) {
+      kb.row().url("Страница записи", `${appUrl}/${slug}`);
+    }
   }
   return kb;
 }
@@ -104,8 +113,44 @@ bot.command("start", async (ctx) => {
 
     const business = await ownerBusiness(String(ctx.from.id));
     await ctx.reply(
-      `Готово, ${user.name}! Уведомления о новых записях будут приходить сюда.\n\nКоманды:\n/today — записи на сегодня\n/help — помощь\n/unlink — отвязать Telegram`,
+      `Готово, ${user.name}! Уведомления о новых записях будут приходить сюда.\n\nКоманды:\n/today — записи на сегодня\n/app — открыть Mini App\n/help — помощь\n/unlink — отвязать Telegram`,
       { reply_markup: ownerKeyboard(business?.slug) },
+    );
+    return;
+  }
+
+  if (payload.startsWith("book_")) {
+    const slug = payload.slice(5).trim();
+    const db = await getDb();
+    const [biz] = await db.select().from(businesses).where(eq(businesses.slug, slug)).limit(1);
+    if (biz) {
+      const isHttps = appUrl.startsWith("https://");
+      const kb = new InlineKeyboard();
+      if (isHttps) {
+        kb.webApp("Записаться онлайн", `${appUrl}/${biz.slug}?tma=1`);
+      } else {
+        kb.url("Записаться онлайн", `${appUrl}/${biz.slug}`);
+      }
+      await ctx.reply(
+        `Онлайн-запись в «${biz.name}»:\nНажмите кнопку ниже, чтобы выбрать услугу, мастера и время.`,
+        { reply_markup: kb },
+      );
+      return;
+    }
+  }
+
+  if (payload.startsWith("booking_")) {
+    const token = payload.slice(8).trim();
+    const isHttps = appUrl.startsWith("https://");
+    const kb = new InlineKeyboard();
+    if (isHttps) {
+      kb.webApp("Управление записью", `${appUrl}/b/${token}?tma=1`);
+    } else {
+      kb.url("Управление записью", `${appUrl}/b/${token}`);
+    }
+    await ctx.reply(
+      "Управление вашей записью в uzbook:\nНажмите кнопку ниже, чтобы посмотреть подробности, перенести или отменить запись.",
+      { reply_markup: kb },
     );
     return;
   }
@@ -113,7 +158,7 @@ bot.command("start", async (ctx) => {
   const business = await ownerBusiness(String(ctx.from.id));
   if (business) {
     await ctx.reply(
-      `С возвращением! Это бот uzbook.\n\n/today — записи на сегодня\n/help — помощь\n/unlink — отвязать Telegram`,
+      `С возвращением! Это бот uzbook.\n\n/today — записи на сегодня\n/app — открыть Mini App\n/help — помощь\n/unlink — отвязать Telegram`,
       { reply_markup: ownerKeyboard(business.slug) },
     );
     return;
@@ -128,6 +173,30 @@ bot.command("start", async (ctx) => {
       `Кабинет: ${appUrl}/dashboard`,
     ].join("\n"),
   );
+});
+
+bot.command("app", async (ctx) => {
+  if (!ctx.from) return;
+  const business = await ownerBusiness(String(ctx.from.id));
+  const isHttps = appUrl.startsWith("https://");
+  const kb = new InlineKeyboard();
+  if (business) {
+    if (isHttps) {
+      kb.webApp("Открыть кабинет", `${appUrl}/dashboard?tma=1`);
+      kb.row().webApp("Страница записи", `${appUrl}/${business.slug}?tma=1`);
+    } else {
+      kb.url("Открыть кабинет", `${appUrl}/dashboard`);
+      kb.row().url("Страница записи", `${appUrl}/${business.slug}`);
+    }
+    await ctx.reply(`Mini App uzbook для «${business.name}»:`, { reply_markup: kb });
+  } else {
+    if (isHttps) {
+      kb.webApp("Открыть uzbook", `${appUrl}?tma=1`);
+    } else {
+      kb.url("Открыть uzbook", appUrl);
+    }
+    await ctx.reply("Открыть uzbook в Telegram Mini App:", { reply_markup: kb });
+  }
 });
 
 bot.command("today", async (ctx) => {
@@ -189,6 +258,7 @@ bot.command("help", async (ctx) => {
       "",
       "Доступные команды:",
       "• /today — список записей и ожидаемая выручка на сегодня",
+      "• /app — открыть Telegram Mini App (кабинет или запись)",
       "• /help — список возможностей и контакты поддержки",
       "• /unlink — отвязать Telegram от кабинета uzbook",
       "",
@@ -280,6 +350,7 @@ bot.catch((error) => {
 async function main() {
   await bot.api.setMyCommands([
     { command: "today", description: "Записи на сегодня" },
+    { command: "app", description: "Открыть Mini App" },
     { command: "help", description: "Помощь и команды" },
     { command: "unlink", description: "Отвязать аккаунт" },
   ]);
