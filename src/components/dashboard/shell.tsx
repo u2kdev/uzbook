@@ -12,6 +12,8 @@ import {
   Menu,
   Scissors,
   Users,
+  UserCheck,
+  Contact2,
   X,
   Building2,
 } from "lucide-react";
@@ -24,6 +26,7 @@ const NAV = [
     items: [
       { href: "/dashboard", label: "Обзор дня", icon: LayoutGrid },
       { href: "/dashboard/bookings", label: "Записи", icon: CalendarDays },
+      { href: "/dashboard/clients", label: "Клиенты", icon: Contact2 },
     ],
   },
   {
