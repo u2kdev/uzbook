@@ -29,11 +29,26 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Build
-        run: npm run build
-
       - name: Fullstack scenarios test
         run: npx tsx scripts/test-fullstack-scenarios.ts
 
+      - name: Billing & Plans test
+        run: npx tsx scripts/test-billing-feature.ts
+
+      - name: Telegram integration test
+        run: npx tsx scripts/test-telegram-production.ts
+
+      - name: Payments lifecycle test
+        run: npx tsx scripts/test-payments-lifecycle.ts
+
+      - name: REST API v1 test
+        run: npx tsx scripts/test-api-v1.ts
+
+      - name: Mobile app logic test
+        run: npx tsx scripts/test-mobile-app.ts
+
+      - name: Next.js Production Build
+        run: npm run build
+
       - name: Production dependency audit
-        run: npm audit --omit=dev
+        run: npm audit --omit=dev --audit-level=high

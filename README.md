@@ -341,12 +341,40 @@ production уходит только по `secure`, поэтому HTTPS обя�
 Локальная PGlite подходит для разработки и одного небольшого инстанса: один
 процесс, нет репликации. Для нескольких реплик и бота нужен обычный Postgres.
 
-## Что дальше
+### Тестирование и валидация
 
-Подробный план по этапам, приоритетам и критериям приёмки — в [ROADMAP.md](./ROADMAP.md).
+В проект включен набор интеграционных тестов, проверяющих всю бизнес-логику:
 
-- криптооплата (USDT/TON) через провайдера или on-chain проверку;
-- SMS/email-напоминания за N часов;
-- несколько филиалов и ролей внутри бизнеса;
-- повторные записи и клиентская база с историей;
-- публичный API и встраиваемый виджет записи.
+```bash
+# 1. Проверка типов TypeScript
+npm run typecheck
+
+# 2. Сквозные сценарии платформы
+npx tsx scripts/test-fullstack-scenarios.ts
+
+# 3. Лимиты тарифов и история подписок
+npx tsx scripts/test-billing-feature.ts
+
+# 4. Telegram Webhook, Bot & Mini App
+npx tsx scripts/test-telegram-production.ts
+
+# 5. Платежи beta (Payme, Click, Crypto USDT, возвраты, TTL)
+npx tsx scripts/test-payments-lifecycle.ts
+
+# 6. REST API v1 (JWT Access/Refresh, слоты, бронирования, кабинет владельца)
+npx tsx scripts/test-api-v1.ts
+
+# 7. Мобильное приложение (хранилище токенов, Deep Links, клиент)
+npx tsx scripts/test-mobile-app.ts
+
+# 8. Предрелизный аудит (Release Gates)
+npx tsx scripts/release-check.ts
+```
+
+## REST API v1 и Мобильное приложение
+
+- **Интерактивная документация API (Swagger UI):** доступна по адресу `https://uzbook.uz/api/v1/docs` (спецификация OpenAPI: `/api/v1/openapi.json`).
+- **Мобильное приложение (iOS & Android):** исходный код и конфигурация EAS Build расположены в директории [`mobile/`](./mobile/README.md).
+- **Регламент эксплуатации и деплоя:** описан в [`deploy/RUNBOOK.md`](./deploy/RUNBOOK.md).
+- **Политика конфиденциальности:** доступна в [`docs/PRIVACY.md`](./docs/PRIVACY.md).
+
