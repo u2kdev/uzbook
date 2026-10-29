@@ -125,8 +125,8 @@ const SECTION_TYPES = [
   },
   {
     type: "custom_html" as const,
-    label: "Свой HTML/JS",
-    description: "Пиксели, чат-виджеты, кастомный код",
+    label: "Свой HTML-блок",
+    description: "Произвольная текстовая или HTML-секция",
     icon: Code,
     defaultConfig: { html: "" },
   },
@@ -741,16 +741,18 @@ function SectionConfigModal({
           {typeInfo?.type === "custom_html" && (
             <>
               <div>
-                <label className="label-base">HTML / JavaScript код</label>
+                <label className="label-base">HTML-разметка</label>
                 <textarea
                   value={String(config.html ?? "")}
                   onChange={(e) => setConfig({ ...config, html: e.target.value })}
                   rows={8}
                   className="input-base h-auto resize-y font-mono text-[12px]"
-                  placeholder="<script>...</script>"
+                  placeholder="<div><h3>Заголовок</h3><p>Текст...</p></div>"
                 />
               </div>
-              <p className="text-[11.5px] text-rose">Будьте осторожны: некорректный код может сломать страницу.</p>
+              <p className="text-[11.5px] text-muted">
+                В целях безопасности скрипты (&lt;script&gt;), встроенные фреймы (&lt;iframe&gt;) и inline-обработчики событий автоматически удаляются.
+              </p>
             </>
           )}
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowUpRight, Clock3, Globe, Instagram, MapPin, Phone, Scissors, Sparkles } from "lucide-react";
 import { BookingWizard, type WizardService, type WizardStaff } from "./booking-wizard";
 import { formatMoney } from "@/lib/plans";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 
 export type PublicPageSection = {
   id: string;
@@ -661,10 +662,11 @@ function RenderVacancies({ section }: { section: PublicPageSection }) {
 
 function RenderCustomHTML({ section }: { section: PublicPageSection }) {
   const config = section.config as { html?: string };
-  if (!config.html) return null;
+  const safeHtml = sanitizeHtml(config.html);
+  if (!safeHtml) return null;
 
   return (
-    <section className="px-5 py-10" dangerouslySetInnerHTML={{ __html: config.html }} />
+    <section className="px-5 py-10" dangerouslySetInnerHTML={{ __html: safeHtml }} />
   );
 }
 

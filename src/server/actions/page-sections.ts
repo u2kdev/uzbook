@@ -7,6 +7,7 @@ import { getDb } from "@/server/db";
 import { businesses, pageSections } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { writeBlockedReason } from "@/server/limits";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 
 export type SectionState = { ok?: boolean; error?: string; sectionId?: string } | null;
 
@@ -24,9 +25,32 @@ const sectionConfigSchema = z.object({
     "custom_html",
   ]),
   enabled: z.boolean().default(true),
-  sortOrder: z.number().int().default(0),
+  sortOrder: z.number().int().min(0).max(1000).default(0),
   config: z.record(z.string(), z.unknown()).default({}),
 });
+
+function sanitizeSectionConfig(
+  type: z.infer<typeof sectionConfigSchema>["type"],
+  config: Record<string, unknown>,
+): Record<string, unknown> {
+  if (type === "custom_html") {
+    return {
+      ...config,
+      html: sanitizeHtml(config.html),
+    };
+  }
+  return config;
+}
+
+function parseConfigJson(raw: FormDataEntryValue | null): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(String(raw ?? "{}"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
 
 async function myBusiness() {
   const session = await requireUser();
@@ -60,16 +84,23 @@ export async function createSectionAction(
   const blocked = writeBlockedReason(business);
   if (blocked) return { error: blocked };
 
+  const rawConfig = parseConfigJson(formData.get("config"));
+  if (!rawConfig) {
+    return { error: "Неверный формат настроек секции" };
+  }
+
   const parsed = sectionConfigSchema.safeParse({
     type: String(formData.get("type") ?? ""),
     enabled: boolField(formData.get("enabled")),
     sortOrder: Number(String(formData.get("sortOrder") ?? "0")),
-    config: JSON.parse(String(formData.get("config") ?? "{}")),
+    config: rawConfig,
   });
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
+
+  const safeConfig = sanitizeSectionConfig(parsed.data.type, parsed.data.config);
 
   const [section] = await db
     .insert(pageSections)
@@ -78,7 +109,7 @@ export async function createSectionAction(
       type: parsed.data.type,
       enabled: parsed.data.enabled,
       sortOrder: parsed.data.sortOrder,
-      config: parsed.data.config,
+      config: safeConfig,
     })
     .returning({ id: pageSections.id });
 
@@ -99,16 +130,23 @@ export async function updateSectionAction(
   const sectionId = String(formData.get("sectionId") ?? "");
   if (!sectionId) return { error: "ID секции не указан" };
 
+  const rawConfig = parseConfigJson(formData.get("config"));
+  if (!rawConfig) {
+    return { error: "Неверный формат настроек секции" };
+  }
+
   const parsed = sectionConfigSchema.safeParse({
     type: String(formData.get("type") ?? ""),
     enabled: boolField(formData.get("enabled")),
     sortOrder: Number(String(formData.get("sortOrder") ?? "0")),
-    config: JSON.parse(String(formData.get("config") ?? "{}")),
+    config: rawConfig,
   });
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
+
+  const safeConfig = sanitizeSectionConfig(parsed.data.type, parsed.data.config);
 
   await db
     .update(pageSections)
@@ -116,7 +154,7 @@ export async function updateSectionAction(
       type: parsed.data.type,
       enabled: parsed.data.enabled,
       sortOrder: parsed.data.sortOrder,
-      config: parsed.data.config,
+      config: safeConfig,
       updatedAt: new Date(),
     })
     .where(and(eq(pageSections.id, sectionId), eq(pageSections.businessId, business.id)));
