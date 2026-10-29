@@ -85,6 +85,11 @@ export function validateProductionEnv(env: NodeJS.ProcessEnv = process.env): Env
     );
   }
 
+  const cryptoFlag = value(env, "PAYMENTS_CRYPTO").toLowerCase();
+  if (["on", "true", "1", "yes"].includes(cryptoFlag) && !value(env, "CRYPTO_DEPOSIT_ADDRESS")) {
+    errors.push("PAYMENTS_CRYPTO is enabled, but CRYPTO_DEPOSIT_ADDRESS is not set.");
+  }
+
   const botToken = value(env, "TELEGRAM_BOT_TOKEN");
   const botUsername = value(env, "TELEGRAM_BOT_USERNAME");
   if (botToken && !botUsername) {

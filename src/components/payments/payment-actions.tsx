@@ -24,8 +24,9 @@ export function PaymentActions({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
-  const [txHash, setTxHash] = useState("");
+  const [txHash, setTxHash] = useState(String(payload?.txHash ?? ""));
   const [copied, setCopied] = useState(false);
+  const [cryptoSubmitted, setCryptoSubmitted] = useState(Boolean(payload?.txHash));
 
   const handleOpenStars = () => {
     if (!checkoutUrl) return;
@@ -72,6 +73,9 @@ export function PaymentActions({
       if (result?.error) {
         setError(result.error);
         return;
+      }
+      if (result?.submitted) {
+        setCryptoSubmitted(true);
       }
       router.refresh();
     });
@@ -154,28 +158,40 @@ export function PaymentActions({
             </div>
           </div>
 
-          <div className="space-y-1.5 pt-1">
-            <label className="text-[11.5px] font-medium text-muted" htmlFor="tx-hash">
-              Хеш транзакции (TXID после перевода):
-            </label>
-            <input
-              id="tx-hash"
-              className="input-base text-[12px]"
-              placeholder="Вставьте хеш (TXID) из кошелька"
-              value={txHash}
-              onChange={(e) => setTxHash(e.target.value)}
-            />
-          </div>
+          {cryptoSubmitted ? (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-[12px] leading-relaxed text-emerald-900">
+              <p className="font-semibold">Транзакция отправлена на проверку</p>
+              <p className="mt-0.5 font-mono text-[10.5px] break-all opacity-80">{txHash}</p>
+              <p className="mt-1">
+                Администратор проверит поступление средств в блокчейне и активирует тариф.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[11.5px] font-medium text-muted" htmlFor="tx-hash">
+                  Хеш транзакции (64-символьный TXID после перевода):
+                </label>
+                <input
+                  id="tx-hash"
+                  className="input-base text-[12px] font-mono"
+                  placeholder="Вставьте 64-символьный TXID из кошелька"
+                  value={txHash}
+                  onChange={(e) => setTxHash(e.target.value)}
+                />
+              </div>
 
-          <button
-            type="button"
-            onClick={confirmCrypto}
-            disabled={pending || !txHash.trim()}
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-ink px-5 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-          >
-            {pending ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
-            {pending ? "Проверяем транзакцию…" : "Подтвердить оплату"}
-          </button>
+              <button
+                type="button"
+                onClick={confirmCrypto}
+                disabled={pending || !txHash.trim()}
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-ink px-5 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+              >
+                {pending ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+                {pending ? "Отправляем на проверку…" : "Отправить TXID на проверку"}
+              </button>
+            </>
+          )}
         </div>
       ) : checkoutUrl ? (
         <a

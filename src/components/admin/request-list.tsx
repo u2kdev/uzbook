@@ -13,6 +13,8 @@ import { formatMoney, planById, type PlanId } from "@/lib/plans";
 export type RequestRow = {
   id: string;
   plan: PlanId;
+  provider?: string;
+  note?: string | null;
   businessName: string;
   businessSlug: string;
   ownerName: string;
@@ -82,6 +84,11 @@ export function RequestList({
                 minute: "2-digit",
               }).format(new Date(request.createdAt))}
             </p>
+            {request.note && (
+              <p className="mt-1 break-all font-mono text-[10.5px] text-ink-soft">
+                {request.note}
+              </p>
+            )}
           </div>
 
           <p className="text-[12px] font-semibold tabular-nums">

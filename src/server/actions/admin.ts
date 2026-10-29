@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { businesses, subscriptions, users } from "@/server/db/schema";
+import { businesses, payments, subscriptions, users } from "@/server/db/schema";
 import { requireAdmin } from "@/server/auth/session";
 import { planById, type PlanId } from "@/lib/plans";
 import { notifyPaymentCompleted } from "@/server/telegram/notify";
@@ -166,9 +166,26 @@ export async function approveSubscriptionAction(subscriptionId: string): Promise
         amount: plan.priceUzs,
         startedAt: now,
         currentPeriodEnd: periodEnd,
-        note: "Подтверждено администратором",
+        note: subscription.note ? `${subscription.note} (подтверждено)` : "Подтверждено администратором",
       })
       .where(eq(subscriptions.id, subscription.id));
+
+    if (subscription.provider === "CRYPTO") {
+      await tx
+        .update(payments)
+        .set({
+          status: "PAID",
+          paidAt: now,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(payments.businessId, subscription.businessId),
+            eq(payments.provider, "CRYPTO"),
+            inArray(payments.status, ["CREATED", "PENDING"]),
+          ),
+        );
+    }
 
     await tx
       .update(businesses)
@@ -181,7 +198,7 @@ export async function approveSubscriptionAction(subscriptionId: string): Promise
     plan: plan.name,
     amount: plan.priceUzs,
     currency: "UZS",
-    provider: "MANUAL",
+    provider: subscription.provider,
     periodEnd: finalPeriodEnd,
   });
 
@@ -192,10 +209,33 @@ export async function approveSubscriptionAction(subscriptionId: string): Promise
 export async function declineSubscriptionAction(subscriptionId: string): Promise<AdminState> {
   await requireAdminRole();
   const db = await getDb();
-  await db
-    .update(subscriptions)
-    .set({ status: "CANCELLED", note: "Отклонено администратором" })
-    .where(and(eq(subscriptions.id, subscriptionId), eq(subscriptions.status, "PENDING")));
+  const [subscription] = await db
+    .select()
+    .from(subscriptions)
+    .where(and(eq(subscriptions.id, subscriptionId), eq(subscriptions.status, "PENDING")))
+    .limit(1);
+
+  if (!subscription) return { error: "Заявка не найдена" };
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(subscriptions)
+      .set({ status: "CANCELLED", note: "Отклонено администратором" })
+      .where(eq(subscriptions.id, subscription.id));
+
+    if (subscription.provider === "CRYPTO") {
+      await tx
+        .update(payments)
+        .set({ status: "FAILED", updatedAt: new Date() })
+        .where(
+          and(
+            eq(payments.businessId, subscription.businessId),
+            eq(payments.provider, "CRYPTO"),
+            inArray(payments.status, ["CREATED", "PENDING"]),
+          ),
+        );
+    }
+  });
   refresh();
   return { ok: true };
 }

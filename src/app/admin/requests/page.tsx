@@ -55,6 +55,8 @@ export default async function AdminRequestsPage() {
           requests={requests.map((row) => ({
             id: row.subscription.id,
             plan: row.subscription.plan,
+            provider: row.subscription.provider,
+            note: row.subscription.note,
             businessName: row.businessName,
             businessSlug: row.businessSlug,
             ownerName: row.ownerName,

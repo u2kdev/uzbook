@@ -56,15 +56,15 @@ export function demoPaymentsEnabled(): boolean {
 export function cryptoPaymentsEnabled(): boolean {
   const flag = process.env.PAYMENTS_CRYPTO?.trim().toLowerCase();
   if (["off", "false", "0", "no"].includes(flag ?? "")) return false;
-  if (["on", "true", "1", "yes"].includes(flag ?? "")) return true;
   return Boolean(process.env.CRYPTO_DEPOSIT_ADDRESS?.trim());
 }
 
 export function cryptoDepositConfig() {
-  const address = process.env.CRYPTO_DEPOSIT_ADDRESS?.trim() || "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+  const address = process.env.CRYPTO_DEPOSIT_ADDRESS?.trim() ?? "";
   const network = process.env.CRYPTO_NETWORK?.trim() || "TRC-20 (TRON)";
   const asset = process.env.CRYPTO_ASSET?.trim() || "USDT";
-  const rateUzs = Number(process.env.CRYPTO_UZS_PER_USD) || 12850;
+  const rateRaw = Number(process.env.CRYPTO_UZS_PER_USD);
+  const rateUzs = Number.isFinite(rateRaw) && rateRaw > 0 ? rateRaw : 12850;
   return { address, network, asset, rateUzs };
 }
 

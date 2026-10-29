@@ -77,6 +77,9 @@ export async function createPayment(params: {
   } else if (provider === "CRYPTO") {
     const { cryptoDepositConfig } = await import("./config");
     const conf = cryptoDepositConfig();
+    if (!conf.address) {
+      throw new Error("Криптокошелёк не настроен (укажите CRYPTO_DEPOSIT_ADDRESS)");
+    }
     const cryptoAmount = Number((plan.priceUzs / conf.rateUzs).toFixed(2));
     url = `/pay/${externalId}`;
     payload = {
@@ -129,7 +132,14 @@ export async function markPaymentPending(params: {
     .where(eq(payments.externalId, params.externalId))
     .limit(1);
   if (!payment) return false;
-  if (payment.status === "PAID" || payment.status === "CANCELLED") return false;
+  if (
+    payment.status === "PAID" ||
+    payment.status === "CANCELLED" ||
+    payment.status === "EXPIRED" ||
+    payment.status === "REFUNDED"
+  ) {
+    return false;
+  }
 
   await db
     .update(payments)
@@ -223,8 +233,12 @@ export async function completePayment(params: {
       };
     }
 
-    if (payment.status === "CANCELLED" || payment.status === "FAILED") {
-      return { ok: false as const, error: "Платёж отменён" };
+    if (
+      payment.status === "CANCELLED" ||
+      payment.status === "FAILED" ||
+      payment.status === "REFUNDED"
+    ) {
+      return { ok: false as const, error: "Платёж отменён или возвращён" };
     }
 
     await tx

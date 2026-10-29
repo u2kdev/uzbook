@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, ne } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { businesses, payments } from "@/server/db/schema";
+import { businesses, payments, subscriptions } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { planById, type PlanId } from "@/lib/plans";
 import {
@@ -15,10 +15,12 @@ import {
   completePayment,
   createPayment,
   getPaymentByExternalId,
+  markPaymentPending,
 } from "@/server/payments/service";
 
 export type PaymentActionState = {
   ok?: boolean;
+  submitted?: boolean;
   error?: string;
   url?: string;
   plan?: PlanId;
@@ -126,8 +128,10 @@ export async function confirmCryptoPaymentAction(
   if (!business) return { error: "Сначала создайте бизнес" };
 
   const cleanHash = txHash?.trim();
-  if (!cleanHash || cleanHash.length < 8) {
-    return { error: "Укажите корректный хеш транзакции (TXID)" };
+  if (!cleanHash || !/^(?:0x)?[a-fA-F0-9]{64}$/.test(cleanHash)) {
+    return {
+      error: "Укажите корректный 64-символьный hex-хеш транзакции (TXID)",
+    };
   }
 
   const row = await getPaymentByExternalId(externalId);
@@ -140,8 +144,8 @@ export async function confirmCryptoPaymentAction(
   if (row.payment.status === "PAID") {
     return { ok: true, plan: row.payment.plan };
   }
-  if (row.payment.status === "CANCELLED" || row.payment.status === "FAILED") {
-    return { error: "Платёж отменён. Создайте новый в разделе «Оплата»." };
+  if (row.payment.status === "CANCELLED" || row.payment.status === "FAILED" || row.payment.status === "EXPIRED") {
+    return { error: "Платёж отменён или истёк. Создайте новый в разделе «Оплата»." };
   }
 
   // Idempotency: verify this transaction hash hasn't been used on any other payment
@@ -155,18 +159,43 @@ export async function confirmCryptoPaymentAction(
     return { error: "Этот хеш транзакции уже был использован ранее" };
   }
 
-  const result = await completePayment({
+  // Never auto-activate subscription without on-chain verification.
+  // Mark payment as PENDING and create a PENDING subscription request for admin review.
+  const marked = await markPaymentPending({
     externalId,
     providerTxnId: cleanHash,
     payload: {
       ...(row.payment.payload ?? {}),
       txHash: cleanHash,
-      confirmedAt: new Date().toISOString(),
+      submittedAt: new Date().toISOString(),
     },
   });
 
-  if (!result.ok) return { error: result.error };
+  if (!marked) {
+    return { error: "Не удалось отправить транзакцию на проверку" };
+  }
+
+  const plan = planById(row.payment.plan);
+  await db.transaction(async (tx) => {
+    await tx
+      .update(subscriptions)
+      .set({ status: "CANCELLED" })
+      .where(
+        and(eq(subscriptions.businessId, business.id), eq(subscriptions.status, "PENDING")),
+      );
+
+    await tx.insert(subscriptions).values({
+      businessId: business.id,
+      plan: row.payment.plan,
+      status: "PENDING",
+      provider: "CRYPTO",
+      amount: plan.priceUzs,
+      currency: row.payment.currency,
+      note: `Крипто-оплата · Заказ ${row.payment.externalId.slice(0, 8)} · TXID: ${cleanHash}`,
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+  });
 
   refreshBilling(business.slug);
-  return { ok: true, plan: result.payment.plan };
+  return { ok: true, submitted: true, plan: row.payment.plan };
 }
