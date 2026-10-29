@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getBusinessBySlug } from "@/server/business/public";
-import { createBooking } from "@/server/booking/service";
+import { createBooking, normalizePhone } from "@/server/booking/service";
 import { getSession } from "@/server/auth/session";
-
+import { clientIp, rateLimit } from "@/server/http/rate-limit";
 import { validateTelegramInitData } from "@/server/telegram/webapp";
 
 export const runtime = "nodejs";
@@ -24,6 +24,20 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
+  const ip = clientIp(request);
+  const ipLimit = rateLimit(`pub_booking_ip:${ip}`, 20, 60_000);
+  if (!ipLimit.ok) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      {
+        status: 429,
+        headers: {
+          "retry-after": String(Math.max(1, Math.ceil((ipLimit.resetAt - Date.now()) / 1000))),
+        },
+      },
+    );
+  }
+
   const { slug } = await params;
   const business = await getBusinessBySlug(slug);
   if (!business || business.status !== "ACTIVE") {
@@ -42,6 +56,12 @@ export async function POST(
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
   }
 
+  const normalizedPhone = normalizePhone(parsed.data.phone);
+  const phoneLimit = rateLimit(`pub_booking_phone:${normalizedPhone}`, 6, 10 * 60_000);
+  if (!phoneLimit.ok) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  }
+
   const session = await getSession();
 
   let source: "WEB" | "TELEGRAM" | "MANUAL" = session ? "MANUAL" : "WEB";
@@ -49,10 +69,14 @@ export async function POST(
 
   if (parsed.data.initData) {
     const validated = validateTelegramInitData(parsed.data.initData);
-    if (validated.valid && validated.user) {
-      source = "TELEGRAM";
-      telegramId = String(validated.user.id);
+    if (!validated.valid || !validated.user) {
+      return NextResponse.json(
+        { error: "invalid_telegram_init_data" },
+        { status: 401 },
+      );
     }
+    source = "TELEGRAM";
+    telegramId = String(validated.user.id);
   }
 
   const result = await createBooking({

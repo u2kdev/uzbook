@@ -75,6 +75,11 @@ export async function POST(request: Request) {
           message: "Выбранное время уже занято или недоступно",
           status: 409,
         },
+        too_many_active_bookings: {
+          code: "too_many_active_bookings",
+          message: "Превышен лимит активных предстоящих записей на этот номер телефона",
+          status: 429,
+        },
         invalid_input: { code: "invalid_input", message: "Неверная дата или параметры", status: 422 },
       };
 

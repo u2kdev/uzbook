@@ -27,9 +27,12 @@ export type BookingFailure =
   | "staff_not_found"
   | "staff_does_not_provide_service"
   | "slot_unavailable"
+  | "too_many_active_bookings"
   | "booking_not_found"
   | "booking_cancelled"
   | "invalid_input";
+
+const MAX_ACTIVE_BOOKINGS_PER_PHONE = 5;
 
 export type Result<T> = { ok: true; data: T } | { ok: false; error: BookingFailure };
 
@@ -127,7 +130,26 @@ export async function createBooking(input: {
         const e = b.endAt.getTime() + b.bufferAfter * 60_000;
         return occupiedStart < e && occupiedEnd > s;
       });
-      if (conflict) return null;
+      if (conflict) return { kind: "conflict" as const };
+
+      if ((input.source ?? "WEB") !== "MANUAL") {
+        const activeForPhone = await tx
+          .select({ id: bookings.id })
+          .from(bookings)
+          .where(
+            and(
+              eq(bookings.businessId, input.business.id),
+              eq(bookings.clientPhone, phone),
+              inArray(bookings.status, ["PENDING", "CONFIRMED"]),
+              sql`${bookings.startAt} > now()`,
+            ),
+          )
+          .limit(MAX_ACTIVE_BOOKINGS_PER_PHONE);
+
+        if (activeForPhone.length >= MAX_ACTIVE_BOOKINGS_PER_PHONE) {
+          return { kind: "too_many" as const };
+        }
+      }
 
       const [client] = await tx
         .insert(clients)
@@ -141,8 +163,8 @@ export async function createBooking(input: {
         .onConflictDoUpdate({
           target: [clients.businessId, clients.phone],
           set: {
-            name: input.name.trim().slice(0, 120),
-            email: input.email?.trim() || null,
+            // Preserve existing CRM client name/email if already set; only fill missing email or verified telegramId
+            email: sql`coalesce(${clients.email}, ${input.email?.trim() || null})`,
             ...(input.telegramId ? { telegramId: input.telegramId } : {}),
           },
         })
@@ -169,13 +191,14 @@ export async function createBooking(input: {
         })
         .returning();
 
-      return row;
+      return { kind: "ok" as const, row };
     });
 
-    if (!created) return { ok: false, error: "slot_unavailable" };
+    if (created.kind === "too_many") return { ok: false, error: "too_many_active_bookings" };
+    if (created.kind !== "ok" || !created.row) return { ok: false, error: "slot_unavailable" };
 
     logger.info("booking.created", {
-      bookingId: created.id,
+      bookingId: created.row.id,
       businessId: input.business.id,
       serviceId: service.id,
       staffId: member.id,
@@ -183,10 +206,10 @@ export async function createBooking(input: {
       source: input.source ?? "WEB",
     });
 
-    void notifyNewBooking(created.id);
+    void notifyNewBooking(created.row.id);
     return {
       ok: true,
-      data: { id: created.id, manageToken, startAt: start, endAt: end },
+      data: { id: created.row.id, manageToken, startAt: start, endAt: end },
     };
   } catch (error) {
     logger.error("booking.create_failed", error, {

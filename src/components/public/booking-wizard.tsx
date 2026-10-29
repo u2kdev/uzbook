@@ -244,7 +244,11 @@ export function BookingWizard({
         setError(
           data.error === "slot_unavailable"
             ? "Это время только что заняли. Выберите другое."
-            : "Не получилось записаться. Попробуйте ещё раз.",
+            : data.error === "too_many_active_bookings"
+              ? "У вас уже есть несколько активных записей в этом салоне."
+              : data.error === "rate_limited"
+                ? "Слишком много запросов. Подождите минуту и попробуйте снова."
+                : "Не получилось записаться. Попробуйте ещё раз.",
         );
         if (data.error === "slot_unavailable") {
           setSlot(null);

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/server/db";
@@ -13,19 +14,50 @@ import {
   setSessionCookie,
   verifyPassword,
 } from "@/server/auth/session";
+import { rateLimit } from "@/server/http/rate-limit";
 import { isValidSlug, slugify } from "@/lib/slug";
 import { logger } from "@/server/logger";
 
 export type AuthState = { error?: string } | null;
 
-const credentials = z.object({
+// Precomputed bcrypt hash (cost 10) used to equalize timing when a user email is not found.
+const DUMMY_PASSWORD_HASH = "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
+async function actionClientIp(): Promise<string> {
+  const h = await headers();
+  const realIp = h.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
+  const forwarded = h.get("x-forwarded-for");
+  if (forwarded) {
+    const parts = forwarded
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const last = parts[parts.length - 1];
+    if (last) return last;
+  }
+  return "unknown";
+}
+
+const loginCredentials = z.object({
   email: z.string().regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "Введите корректный email"),
-  password: z.string().min(6, "Пароль минимум 6 символов"),
+  password: z.string().min(6, "Пароль минимум 6 символов").max(128),
+});
+
+const registerCredentials = z.object({
+  email: z.string().regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "Введите корректный email"),
+  password: z.string().min(8, "Пароль минимум 8 символов").max(128),
 });
 
 export async function registerAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const ip = await actionClientIp();
+  const ipLimit = rateLimit(`web_register_ip:${ip}`, 10, 10 * 60_000);
+  if (!ipLimit.ok) {
+    return { error: "Слишком много попыток регистрации. Подождите несколько минут." };
+  }
+
   const name = String(formData.get("name") ?? "").trim();
-  const parsed = credentials.safeParse({
+  const parsed = registerCredentials.safeParse({
     email: String(formData.get("email") ?? "").trim().toLowerCase(),
     password: String(formData.get("password") ?? ""),
   });
@@ -52,18 +84,29 @@ export async function registerAction(_prev: AuthState, formData: FormData): Prom
     })
     .returning();
 
-  logger.info("auth.register", { userId: user.id, email: user.email, role: user.role });
+  logger.info("auth.register", { userId: user.id, role: user.role });
 
   await setSessionCookie(user);
   redirect("/onboarding");
 }
 
 export async function loginAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
-  const parsed = credentials.safeParse({
+  const ip = await actionClientIp();
+  const ipLimit = rateLimit(`web_login_ip:${ip}`, 15, 60_000);
+  if (!ipLimit.ok) {
+    return { error: "Слишком много попыток входа. Попробуйте через минуту." };
+  }
+
+  const parsed = loginCredentials.safeParse({
     email: String(formData.get("email") ?? "").trim().toLowerCase(),
     password: String(formData.get("password") ?? ""),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const emailLimit = rateLimit(`web_login_email:${parsed.data.email}`, 8, 60_000);
+  if (!emailLimit.ok) {
+    return { error: "Слишком много попыток входа для этого аккаунта. Подождите минуту." };
+  }
 
   const db = await getDb();
   const [user] = await db
@@ -72,35 +115,18 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
     .where(eq(users.email, parsed.data.email))
     .limit(1);
   if (!user) {
-    logger.warn("auth.login_failed", { email: parsed.data.email, reason: "user_not_found" });
-    return { error: "Не нашли аккаунт с таким email." };
+    await verifyPassword(parsed.data.password, DUMMY_PASSWORD_HASH);
+    logger.warn("auth.login_failed", { reason: "user_not_found", ip });
+    return { error: "Неверный email или пароль." };
   }
 
-  let valid = await verifyPassword(parsed.data.password, user.passwordHash);
-  if (
-    !valid &&
-    ["owner@uzbook.online", "admin@uzbook.online", "support@uzbook.online", "demo@uzbook.online", "barber@uzbook.online"].includes(user.email)
-  ) {
-    const devPasswords = [
-      "secret123",
-      "owner1234",
-      "admin1234",
-      "support1234",
-      "demo1234",
-      "barber1234",
-      "123456",
-      "password",
-    ];
-    if (devPasswords.includes(parsed.data.password)) {
-      valid = true;
-    }
-  }
+  const valid = await verifyPassword(parsed.data.password, user.passwordHash);
   if (!valid) {
-    logger.warn("auth.login_failed", { email: user.email, userId: user.id, reason: "invalid_password" });
-    return { error: "Неверный пароль." };
+    logger.warn("auth.login_failed", { userId: user.id, reason: "invalid_password", ip });
+    return { error: "Неверный email или пароль." };
   }
 
-  logger.info("auth.login_success", { userId: user.id, email: user.email, role: user.role });
+  logger.info("auth.login_success", { userId: user.id, role: user.role });
 
   await setSessionCookie(user);
   redirect(user.role === "OWNER" ? "/dashboard" : "/admin");

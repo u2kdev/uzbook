@@ -4,6 +4,7 @@ import { getDb } from "@/server/db";
 import { services, staff, staffServices } from "@/server/db/schema";
 import { getBusinessBySlug } from "@/server/business/public";
 import { getAvailableSlots } from "@/server/booking/slots";
+import { clientIp, rateLimit } from "@/server/http/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +13,12 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
+  const ip = clientIp(request);
+  const limit = rateLimit(`pub_availability:${ip}`, 120, 60_000);
+  if (!limit.ok) {
+    return NextResponse.json({ error: "rate_limited", slots: [] }, { status: 429 });
+  }
+
   const { slug } = await params;
   const url = new URL(request.url);
   const staffId = url.searchParams.get("staffId") ?? "";

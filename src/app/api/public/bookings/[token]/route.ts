@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { cancelBooking, getBookingByToken } from "@/server/booking/service";
+import { clientIp, rateLimit } from "@/server/http/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
+  const ip = clientIp(request);
+  if (!rateLimit(`pub_booking_get:${ip}`, 60, 60_000).ok) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  }
   const { token } = await params;
   const booking = await getBookingByToken(token);
   if (!booking) return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -26,9 +31,13 @@ export async function GET(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
+  const ip = clientIp(request);
+  if (!rateLimit(`pub_booking_cancel:${ip}`, 20, 60_000).ok) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  }
   const { token } = await params;
   const result = await cancelBooking(token);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
