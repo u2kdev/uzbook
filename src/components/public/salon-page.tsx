@@ -98,20 +98,46 @@ const CATEGORY_LABEL: Record<string, string> = {
   other: "Услуги",
 };
 
-function RenderHero({ business, nearest, openBooking, staff, serif }: {
+function RenderHero({
+  section,
+  business,
+  nearest,
+  openBooking,
+  staff,
+  serif,
+}: {
+  section?: PublicPageSection;
   business: SalonData["business"];
   nearest: { date: string; label: string } | null;
   openBooking: (staffId?: string) => void;
   staff: SalonData["staff"];
   serif: boolean;
 }) {
+  const config = (section?.config ?? {}) as {
+    showNearestSlot?: boolean;
+    showPhoneButton?: boolean;
+    ctaText?: string;
+    badgeText?: string;
+    align?: "left" | "center";
+  };
+  const showNearest = config.showNearestSlot ?? true;
+  const showPhone = config.showPhoneButton ?? true;
+  const ctaText = config.ctaText?.trim() || "Записаться онлайн";
+  const badgeText =
+    config.badgeText?.trim() || CATEGORY_LABEL[business.category] || "Запись онлайн";
+  const isCentered = config.align === "center";
+
   return (
     <section className="px-5 pt-10 pb-8 sm:pt-14">
-      <div className="grid items-end gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-        <div>
+      <div
+        className={`grid items-end gap-8 ${
+          isCentered ? "mx-auto max-w-2xl text-center" : "lg:grid-cols-[1.15fr_0.85fr]"
+        }`}
+      >
+        <div className={isCentered ? "flex flex-col items-center" : ""}>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-ink/[0.04] px-2.5 py-1 text-[10px] font-medium tracking-[0.14em] uppercase">
             <span className="size-1.5 rounded-full" style={{ background: business.accent }} />
-            {CATEGORY_LABEL[business.category] ?? "Запись онлайн"}
+            {badgeText}
           </span>
 
           <h1
@@ -128,7 +154,11 @@ function RenderHero({ business, nearest, openBooking, staff, serif }: {
             </p>
           )}
 
-          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-ink/55">
+          <div
+            className={`mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-ink/55 ${
+              isCentered ? "justify-center" : ""
+            }`}
+          >
             {business.city && (
               <span className="inline-flex items-center gap-1.5">
                 <MapPin size={13} strokeWidth={1.7} /> {business.city}
@@ -139,7 +169,7 @@ function RenderHero({ business, nearest, openBooking, staff, serif }: {
                 {business.address}
               </span>
             )}
-            {nearest && (
+            {showNearest && nearest && (
               <span className="inline-flex items-center gap-1.5">
                 <Clock3 size={13} strokeWidth={1.7} />
                 Ближайшее окно: {dayWord(nearest.date, business.timezone)} в {nearest.label}
@@ -147,18 +177,22 @@ function RenderHero({ business, nearest, openBooking, staff, serif }: {
             )}
           </div>
 
-          <div className="mt-7 flex flex-wrap items-center gap-3">
+          <div
+            className={`mt-7 flex flex-wrap items-center gap-3 ${
+              isCentered ? "justify-center" : ""
+            }`}
+          >
             <button
               onClick={() => openBooking()}
               className="btn group h-12 px-3 pl-6 text-white shadow-[0_18px_40px_-20px_rgba(0,0,0,0.5)]"
               style={{ background: business.accent }}
             >
-              Записаться онлайн
+              {ctaText}
               <span className="grid size-8 place-items-center rounded-full bg-white/20 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-1 group-hover:-translate-y-px">
                 <ArrowUpRight size={16} strokeWidth={1.7} />
               </span>
             </button>
-            {business.phone && (
+            {showPhone && business.phone && (
               <a
                 href={`tel:${business.phone.replace(/\s/g, "")}`}
                 className="btn btn-ghost h-12 border-line bg-white/60 text-[13px] hover:bg-white"
@@ -169,44 +203,46 @@ function RenderHero({ business, nearest, openBooking, staff, serif }: {
           </div>
         </div>
 
-        <div className="relative hidden lg:block">
-          <div className="absolute -inset-6 rounded-[36px] bg-[radial-gradient(60%_60%_at_70%_20%,var(--accent),transparent_70%)] opacity-[0.13]" />
-          <div className="relative overflow-hidden rounded-[28px] border border-line bg-white p-5 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.5)]">
-            <p className="text-[10px] font-semibold tracking-[0.16em] text-muted uppercase">
-              Свободно на неделю
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {staff.slice(0, 4).map((member) => (
-                <button
-                  key={member.id}
-                  onClick={() => openBooking(member.id)}
-                  className="flex items-center gap-2.5 rounded-xl border border-line/70 bg-paper p-2.5 text-left transition-colors hover:bg-white"
-                >
-                  <span
-                    className="grid size-8 shrink-0 place-items-center rounded-full text-[11px] font-semibold text-white"
-                    style={{ background: member.color }}
+        {!isCentered && (
+          <div className="relative hidden lg:block">
+            <div className="absolute -inset-6 rounded-[36px] bg-[radial-gradient(60%_60%_at_70%_20%,var(--accent),transparent_70%)] opacity-[0.13]" />
+            <div className="relative overflow-hidden rounded-[28px] border border-line bg-white p-5 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.5)]">
+              <p className="text-[10px] font-semibold tracking-[0.16em] text-muted uppercase">
+                Свободно на неделю
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {staff.slice(0, 4).map((member) => (
+                  <button
+                    key={member.id}
+                    onClick={() => openBooking(member.id)}
+                    className="flex items-center gap-2.5 rounded-xl border border-line/70 bg-paper p-2.5 text-left transition-colors hover:bg-white"
                   >
-                    {member.name.slice(0, 1)}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-[11.5px] font-semibold">{member.name}</p>
-                    <p className="truncate text-[10px] text-muted">
-                      {member.nextSlots
-                        ? `${dayWord(member.nextSlots.date, business.timezone)}, ${member.nextSlots.slots[0]?.label}`
-                        : "нет окон"}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-[10.5px] text-muted">
-              <span>{staff.length} мастеров</span>
-              <span className="inline-flex items-center gap-1">
-                <Sparkles size={11} /> без звонков
-              </span>
+                    <span
+                      className="grid size-8 shrink-0 place-items-center rounded-full text-[11px] font-semibold text-white"
+                      style={{ background: member.color }}
+                    >
+                      {member.name.slice(0, 1)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-[11.5px] font-semibold">{member.name}</p>
+                      <p className="truncate text-[10px] text-muted">
+                        {member.nextSlots
+                          ? `${dayWord(member.nextSlots.date, business.timezone)}, ${member.nextSlots.slots[0]?.label}`
+                          : "нет окон"}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-[10.5px] text-muted">
+                <span>{staff.length} мастеров</span>
+                <span className="inline-flex items-center gap-1">
+                  <Sparkles size={11} /> без звонков
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </section>
   );
@@ -223,29 +259,60 @@ function RenderDescription({ business }: { business: SalonData["business"] }) {
   );
 }
 
-function RenderStaff({ business, staff, openBooking, serif }: {
+function RenderStaff({
+  section,
+  business,
+  staff,
+  openBooking,
+  serif,
+}: {
+  section?: PublicPageSection;
   business: SalonData["business"];
   staff: SalonData["staff"];
   openBooking: (staffId?: string) => void;
   serif: boolean;
 }) {
+  const config = (section?.config ?? {}) as {
+    title?: string;
+    subtitle?: string;
+    showBio?: boolean;
+    showNextSlots?: boolean;
+    columns?: number;
+  };
+  const title = config.title?.trim() || "Мастера";
+  const subtitle =
+    config.subtitle !== undefined
+      ? config.subtitle
+      : "Нажмите на мастера, чтобы увидеть свободное время";
+  const showBio = config.showBio ?? true;
+  const showNextSlots = config.showNextSlots ?? true;
+  const cols = Number(config.columns ?? 3);
+  const gridColsClass =
+    cols === 1
+      ? "grid-cols-1"
+      : cols === 2
+        ? "sm:grid-cols-2"
+        : "sm:grid-cols-2 lg:grid-cols-3";
+
   return (
     <section className="px-5 py-10">
-      <div className="mb-6 flex items-end justify-between">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-[10px] font-semibold tracking-[0.18em] text-muted uppercase">
             Команда
           </p>
           <h2 className={`mt-2 text-[26px] font-semibold tracking-[-0.03em] ${serif ? "font-serif font-medium" : ""}`}>
-            Мастера
+            {title}
           </h2>
         </div>
-        <p className="hidden text-[11.5px] text-muted sm:block">
-          Нажмите на мастера, чтобы увидеть свободное время
-        </p>
+        {subtitle && (
+          <p className="text-[11.5px] text-muted">
+            {subtitle}
+          </p>
+        )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className={`grid gap-3 ${gridColsClass}`}>
         {staff.map((member) => (
           <button
             key={member.id}
@@ -274,35 +341,37 @@ function RenderStaff({ business, staff, openBooking, serif }: {
               />
             </div>
 
-            {member.bio && (
+            {showBio && member.bio && (
               <p className="mt-3 line-clamp-2 text-[11.5px] leading-relaxed text-ink/50">
                 {member.bio}
               </p>
             )}
 
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {member.nextSlots ? (
-                <>
-                  <span className="text-[10.5px] text-muted">
-                    {dayWord(member.nextSlots.date, business.timezone)}:
-                  </span>
-                  {member.nextSlots.slots.slice(0, 3).map((slot) => (
-                    <span
-                      key={slot.start}
-                      className="rounded-md px-1.5 py-0.5 text-[10.5px] font-medium"
-                      style={{
-                        background: `${business.accent}12`,
-                        color: business.accent,
-                      }}
-                    >
-                      {slot.label}
+            {showNextSlots && (
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {member.nextSlots ? (
+                  <>
+                    <span className="text-[10.5px] text-muted">
+                      {dayWord(member.nextSlots.date, business.timezone)}:
                     </span>
-                  ))}
-                </>
-              ) : (
-                <span className="text-[10.5px] text-muted">Ближайшее время уточняйте</span>
-              )}
-            </div>
+                    {member.nextSlots.slots.slice(0, 3).map((slot) => (
+                      <span
+                        key={slot.start}
+                        className="rounded-md px-1.5 py-0.5 text-[10.5px] font-medium"
+                        style={{
+                          background: `${business.accent}12`,
+                          color: business.accent,
+                        }}
+                      >
+                        {slot.label}
+                      </span>
+                    ))}
+                  </>
+                ) : (
+                  <span className="text-[10.5px] text-muted">Ближайшее время уточняйте</span>
+                )}
+              </div>
+            )}
           </button>
         ))}
       </div>
@@ -310,7 +379,15 @@ function RenderStaff({ business, staff, openBooking, serif }: {
   );
 }
 
-function RenderServices({ business, services, staff, openBooking, categories, serif }: {
+function RenderServices({
+  section,
+  business,
+  services,
+  openBooking,
+  categories,
+  serif,
+}: {
+  section?: PublicPageSection;
   business: SalonData["business"];
   services: WizardService[];
   staff: SalonData["staff"];
@@ -318,49 +395,71 @@ function RenderServices({ business, services, staff, openBooking, categories, se
   categories: string[];
   serif: boolean;
 }) {
+  const config = (section?.config ?? {}) as {
+    title?: string;
+    subtitle?: string;
+    groupByCategory?: boolean;
+    showPrices?: boolean;
+    showDuration?: boolean;
+  };
+  const title = config.title?.trim() || "Услуги";
+  const subtitle = config.subtitle?.trim() || "Прайс";
+  const groupByCategory = config.groupByCategory ?? true;
+  const showPrices = (config.showPrices ?? true) && business.showPrices;
+  const showDuration = config.showDuration ?? true;
+
+  const groups = groupByCategory
+    ? categories.map((cat) => ({
+        label: cat,
+        items: services.filter((s) => (s.category?.trim() || "Услуги") === cat),
+      }))
+    : [{ label: "", items: services }];
+
   return (
     <section className="px-5 py-10">
-      <p className="text-[10px] font-semibold tracking-[0.18em] text-muted uppercase">Прайс</p>
+      <p className="text-[10px] font-semibold tracking-[0.18em] text-muted uppercase">{subtitle}</p>
       <h2 className={`mt-2 text-[26px] font-semibold tracking-[-0.03em] ${serif ? "font-serif font-medium" : ""}`}>
-        Услуги
+        {title}
       </h2>
 
       <div className="mt-6 space-y-8">
-        {categories.map((category) => (
-          <div key={category}>
-            <p className="mb-2 text-[11px] font-semibold tracking-[0.08em] text-muted/80 uppercase">
-              {category}
-            </p>
+        {groups.map((group, gIdx) => (
+          <div key={group.label || gIdx}>
+            {group.label && (
+              <p className="mb-2 text-[11px] font-semibold tracking-[0.08em] text-muted/80 uppercase">
+                {group.label}
+              </p>
+            )}
             <div className="overflow-hidden rounded-[20px] border border-black/[0.06] bg-white">
-              {services
-                .filter((service) => (service.category?.trim() || "Услуги") === category)
-                .map((service, index) => (
-                  <button
-                    key={service.id}
-                    onClick={() => openBooking()}
-                    className={`flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors hover:bg-[#fcfbfa] ${
-                      index > 0 ? "border-t border-black/[0.05]" : ""
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13.5px] font-medium">{service.name}</p>
-                      {service.description && (
-                        <p className="mt-0.5 line-clamp-1 text-[11.5px] text-muted">
-                          {service.description}
-                        </p>
-                      )}
-                    </div>
-                    <span className="hidden items-center gap-1 text-[11px] text-muted sm:flex">
+              {group.items.map((service, index) => (
+                <button
+                  key={service.id}
+                  onClick={() => openBooking()}
+                  className={`flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors hover:bg-[#fcfbfa] ${
+                    index > 0 ? "border-t border-black/[0.05]" : ""
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13.5px] font-medium">{service.name}</p>
+                    {service.description && (
+                      <p className="mt-0.5 line-clamp-1 text-[11.5px] text-muted">
+                        {service.description}
+                      </p>
+                    )}
+                  </div>
+                  {showDuration && (
+                    <span className="flex items-center gap-1 text-[11px] text-muted">
                       <Clock3 size={12} strokeWidth={1.6} />
                       {durationLabel(service.durationMin)}
                     </span>
-                    {business.showPrices && (
-                      <span className="text-[13px] font-semibold tabular-nums">
-                        {formatMoney(service.price, business.currency)}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                  )}
+                  {showPrices && (
+                    <span className="text-[13px] font-semibold tabular-nums">
+                      {formatMoney(service.price, business.currency)}
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         ))}
@@ -369,13 +468,36 @@ function RenderServices({ business, services, staff, openBooking, categories, se
   );
 }
 
-function RenderContacts({ business }: { business: SalonData["business"] }) {
-  const hasContacts = business.address || business.phone || business.instagram;
-  if (!hasContacts) return null;
+function RenderContacts({
+  section,
+  business,
+}: {
+  section?: PublicPageSection;
+  business: SalonData["business"];
+}) {
+  const config = (section?.config ?? {}) as {
+    title?: string;
+    showAddress?: boolean;
+    showPhone?: boolean;
+    showInstagram?: boolean;
+    showWebsite?: boolean;
+  };
+  const showAddress = (config.showAddress ?? true) && Boolean(business.address);
+  const showPhone = (config.showPhone ?? true) && Boolean(business.phone);
+  const showInstagram = (config.showInstagram ?? true) && Boolean(business.instagram);
+  const showWebsite = (config.showWebsite ?? true) && Boolean(business.website);
+
+  if (!showAddress && !showPhone && !showInstagram && !showWebsite) return null;
+
   return (
     <section className="px-5 py-10">
+      {config.title && (
+        <p className="mb-4 text-[10px] font-semibold tracking-[0.18em] text-muted uppercase">
+          {config.title}
+        </p>
+      )}
       <div className="grid gap-3 sm:grid-cols-3">
-        {business.address && (
+        {showAddress && business.address && (
           <div className="rounded-2xl border border-black/[0.06] bg-white p-4">
             <MapPin size={16} strokeWidth={1.6} className="text-muted" />
             <p className="mt-2.5 text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
@@ -385,7 +507,7 @@ function RenderContacts({ business }: { business: SalonData["business"] }) {
             {business.city && <p className="text-[11.5px] text-muted">{business.city}</p>}
           </div>
         )}
-        {business.phone && (
+        {showPhone && business.phone && (
           <a
             href={`tel:${business.phone.replace(/\s/g, "")}`}
             className="rounded-2xl border border-black/[0.06] bg-white p-4 transition-colors hover:bg-[#fcfbfa]"
@@ -397,7 +519,7 @@ function RenderContacts({ business }: { business: SalonData["business"] }) {
             <p className="mt-1 text-[13px] font-medium">{business.phone}</p>
           </a>
         )}
-        {business.instagram && (
+        {showInstagram && business.instagram && (
           <a
             href={`https://instagram.com/${business.instagram.replace("@", "")}`}
             target="_blank"
@@ -411,7 +533,7 @@ function RenderContacts({ business }: { business: SalonData["business"] }) {
             <p className="mt-1 text-[13px] font-medium">@{business.instagram.replace("@", "")}</p>
           </a>
         )}
-        {business.website && (
+        {showWebsite && business.website && (
           <a
             href={business.website.startsWith("http") ? business.website : `https://${business.website}`}
             target="_blank"
@@ -683,13 +805,13 @@ function RenderSection({ section, business, services, staff, openBooking, catego
 }) {
   switch (section.type) {
     case "hero":
-      return <RenderHero business={business} nearest={nearest} openBooking={openBooking} staff={staff} serif={serif} />;
+      return <RenderHero section={section} business={business} nearest={nearest} openBooking={openBooking} staff={staff} serif={serif} />;
     case "staff":
-      return <RenderStaff business={business} staff={staff} openBooking={openBooking} serif={serif} />;
+      return <RenderStaff section={section} business={business} staff={staff} openBooking={openBooking} serif={serif} />;
     case "services":
-      return <RenderServices business={business} services={services} staff={staff} openBooking={openBooking} categories={categories} serif={serif} />;
+      return <RenderServices section={section} business={business} services={services} staff={staff} openBooking={openBooking} categories={categories} serif={serif} />;
     case "contacts":
-      return <RenderContacts business={business} />;
+      return <RenderContacts section={section} business={business} />;
     case "reviews":
       return <RenderReviews section={section} />;
     case "promotions":
