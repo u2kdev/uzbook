@@ -98,29 +98,31 @@ export async function createPayment(params: {
     throw new Error("Этот способ оплаты пока не поддерживается");
   }
 
-  await db
-    .update(payments)
-    .set({ status: "CANCELLED", updatedAt: new Date() })
-    .where(
-      and(
-        eq(payments.businessId, business.id),
-        inArray(payments.status, ["CREATED", "PENDING"]),
-      ),
-    );
+  const [payment] = await db.transaction(async (tx) => {
+    await tx
+      .update(payments)
+      .set({ status: "CANCELLED", updatedAt: new Date() })
+      .where(
+        and(
+          eq(payments.businessId, business.id),
+          inArray(payments.status, ["CREATED", "PENDING"]),
+        ),
+      );
 
-  const [payment] = await db
-    .insert(payments)
-    .values({
-      businessId: business.id,
-      plan: params.plan,
-      provider,
-      status: "CREATED",
-      amount: plan.priceUzs,
-      currency: "UZS",
-      externalId,
-      payload,
-    })
-    .returning();
+    return tx
+      .insert(payments)
+      .values({
+        businessId: business.id,
+        plan: params.plan,
+        provider,
+        status: "CREATED",
+        amount: plan.priceUzs,
+        currency: "UZS",
+        externalId,
+        payload,
+      })
+      .returning();
+  });
 
   return { payment, url };
 }
@@ -131,32 +133,35 @@ export async function markPaymentPending(params: {
   payload?: Record<string, unknown>;
 }): Promise<boolean> {
   const db = await getDb();
-  const [payment] = await db
-    .select()
-    .from(payments)
-    .where(eq(payments.externalId, params.externalId))
-    .limit(1);
-  if (!payment) return false;
-  if (
-    payment.status === "PAID" ||
-    payment.status === "CANCELLED" ||
-    payment.status === "EXPIRED" ||
-    payment.status === "REFUNDED"
-  ) {
-    return false;
-  }
+  return db.transaction(async (tx) => {
+    const [payment] = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.externalId, params.externalId))
+      .limit(1)
+      .for("update");
+    if (!payment) return false;
+    if (
+      payment.status === "PAID" ||
+      payment.status === "CANCELLED" ||
+      payment.status === "EXPIRED" ||
+      payment.status === "REFUNDED"
+    ) {
+      return false;
+    }
 
-  await db
-    .update(payments)
-    .set({
-      status: "PENDING",
-      providerTxnId: params.providerTxnId ?? payment.providerTxnId,
-      payload: { ...(payment.payload ?? {}), ...(params.payload ?? {}) },
-      updatedAt: new Date(),
-    })
-    .where(eq(payments.id, payment.id));
+    await tx
+      .update(payments)
+      .set({
+        status: "PENDING",
+        providerTxnId: params.providerTxnId ?? payment.providerTxnId,
+        payload: { ...(payment.payload ?? {}), ...(params.payload ?? {}) },
+        updatedAt: new Date(),
+      })
+      .where(eq(payments.id, payment.id));
 
-  return true;
+    return true;
+  });
 }
 
 /**
@@ -398,6 +403,7 @@ export async function refundPayment(params: {
   paymentId?: string;
   reason?: string;
   refundedByUserId?: string | null;
+  extraPayload?: Record<string, unknown>;
 }): Promise<{ ok: boolean; error?: string }> {
   const db = await getDb();
   const conditions: SQL[] = [];
@@ -426,6 +432,7 @@ export async function refundPayment(params: {
           refund_reason: params.reason ?? "customer_refund",
           refunded_at: now.toISOString(),
           refunded_by: params.refundedByUserId ?? null,
+          ...(params.extraPayload ?? {}),
         },
         updatedAt: now,
       })

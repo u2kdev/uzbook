@@ -1,4 +1,5 @@
-import { and, eq } from "drizzle-orm";
+import crypto from "node:crypto";
+import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/server/db";
 import { payments } from "@/server/db/schema";
@@ -10,6 +11,7 @@ import {
   completePayment,
   getPaymentByExternalId,
   markPaymentPending,
+  refundPayment,
 } from "@/server/payments/service";
 import { sanitizePaymentPayload, trackWebhookFailure } from "@/server/payments/security";
 import { logger } from "@/server/logger";
@@ -53,7 +55,13 @@ function authorized(request: Request): boolean {
   if (!key) return false;
   const header = request.headers.get("authorization") ?? "";
   const encoded = header.replace(/^Basic\s+/i, "").trim();
-  return encoded === Buffer.from(`Paycom:${key}`).toString("base64");
+  const expected = Buffer.from(`Paycom:${key}`).toString("base64");
+  const expectedBuf = Buffer.from(expected);
+  const receivedBuf = Buffer.from(encoded);
+  return (
+    expectedBuf.length === receivedBuf.length &&
+    crypto.timingSafeEqual(expectedBuf, receivedBuf)
+  );
 }
 
 function transactionState(payment: {
@@ -61,8 +69,9 @@ function transactionState(payment: {
   paidAt: Date | null;
 }): number {
   if (payment.status === "PAID") return 2;
+  if (payment.status === "REFUNDED") return -2;
   if (payment.status === "CANCELLED") return payment.paidAt ? -2 : -1;
-  if (payment.status === "FAILED") return -1;
+  if (payment.status === "FAILED" || payment.status === "EXPIRED") return -1;
   return 1;
 }
 
@@ -228,9 +237,31 @@ export async function POST(request: Request) {
     const existing = await findByTransaction(transactionId);
     if (!existing) return fail(id, ERRORS.transaction);
 
+    const existingPayload = (existing.payload ?? {}) as Record<string, unknown>;
+    if (existing.status === "CANCELLED" || existing.status === "REFUNDED") {
+      return answer(id, {
+        transaction: transactionId,
+        cancel_time: Number(existingPayload.payme_cancel_time) || existing.updatedAt.getTime(),
+        state: existing.status === "REFUNDED" || existing.paidAt ? -2 : -1,
+      });
+    }
+
     const wasPaid = existing.status === "PAID";
     const cancelTime = Date.now();
-    if (!(existing.status === "CANCELLED")) {
+
+    if (wasPaid) {
+      await refundPayment({
+        paymentId: existing.id,
+        reason: `payme_cancel_${params.reason ?? 0}`,
+        extraPayload: {
+          payme_cancel_time: cancelTime,
+          payme_reason: params.reason ?? 0,
+        },
+      });
+      revalidatePath("/dashboard");
+      revalidatePath("/dashboard/billing");
+      revalidatePath("/admin");
+    } else {
       await cancelPayment({
         providerTxnId: transactionId,
         reason: `payme_cancel_${params.reason ?? 0}`,
@@ -254,45 +285,52 @@ export async function POST(request: Request) {
     if (!existing) return fail(id, ERRORS.transaction);
 
     const payload = (existing.payload ?? {}) as Record<string, unknown>;
+    const isCancelledOrRefunded =
+      existing.status === "CANCELLED" || existing.status === "REFUNDED";
     return answer(id, {
       create_time: createTimeOf(existing),
       perform_time: existing.paidAt?.getTime() ?? 0,
       cancel_time: Number(payload.payme_cancel_time ?? 0),
       transaction: transactionId,
       state: transactionState(existing),
-      reason: existing.status === "CANCELLED" ? payload.payme_reason ?? 0 : null,
+      reason: isCancelledOrRefunded ? payload.payme_reason ?? 0 : null,
     });
   }
 
   if (method === "GetStatement") {
     const from = Number(params.from) || 0;
     const to = Number(params.to) || Date.now();
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
     const db = await getDb();
     const rows = await db
       .select()
       .from(payments)
-      .where(and(eq(payments.provider, "PAYME"), eq(payments.status, "PAID")));
+      .where(
+        and(
+          eq(payments.provider, "PAYME"),
+          eq(payments.status, "PAID"),
+          gte( sql`coalesce(${payments.paidAt}, ${payments.createdAt})`, fromDate),
+          lte( sql`coalesce(${payments.paidAt}, ${payments.createdAt})`, toDate),
+        ),
+      )
+      .orderBy(asc(payments.createdAt));
 
     return answer(
       id,
       {
-        transactions: rows
-          .filter((row) => {
-            const time = row.paidAt?.getTime() ?? row.createdAt.getTime();
-            return time >= from && time <= to;
-          })
-          .map((row) => ({
-            id: row.providerTxnId,
-            time: row.createdAt.getTime(),
-            amount: row.amount * 100,
-            account: { order_id: row.externalId },
-            create_time: createTimeOf(row),
-            perform_time: row.paidAt?.getTime() ?? 0,
-            cancel_time: 0,
-            transaction: row.providerTxnId,
-            state: 2,
-            reason: null,
-          })),
+        transactions: rows.map((row) => ({
+          id: row.providerTxnId,
+          time: row.createdAt.getTime(),
+          amount: row.amount * 100,
+          account: { order_id: row.externalId },
+          create_time: createTimeOf(row),
+          perform_time: row.paidAt?.getTime() ?? 0,
+          cancel_time: 0,
+          transaction: row.providerTxnId,
+          state: 2,
+          reason: null,
+        })),
       },
     );
   }

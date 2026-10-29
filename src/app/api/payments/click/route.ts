@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { clientIp, isIpAllowed, rateLimit } from "@/server/http/rate-limit";
 import { clickConfig } from "@/server/payments/config";
 import {
@@ -130,8 +130,14 @@ export async function POST(request: Request) {
     amount,
     action,
     signTime,
-  });
-  if (expectedSign.toLowerCase() !== signString.toLowerCase()) {
+  }).toLowerCase();
+  const receivedSign = signString.trim().toLowerCase();
+  const expectedBuf = Buffer.from(expectedSign);
+  const receivedBuf = Buffer.from(receivedSign);
+  if (
+    expectedBuf.length !== receivedBuf.length ||
+    !timingSafeEqual(expectedBuf, receivedBuf)
+  ) {
     trackWebhookFailure("click", "invalid_signature", ip);
     return reply({ error: -1, error_note: "Invalid sign" });
   }
@@ -179,6 +185,9 @@ export async function POST(request: Request) {
 
   if (action === "1") {
     if (error !== 0) {
+      if (payment.status === "PAID") {
+        return reply({ error: -4, error_note: "Already paid" });
+      }
       await failPayment(merchantTransId);
       return reply({
         error: 0,
