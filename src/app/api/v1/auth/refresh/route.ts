@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/server/db";
 import { users } from "@/server/db/schema";
+import { tokenFingerprint } from "@/server/auth/jwt";
 import { createAuthTokens, verifyRefreshToken } from "@/server/api/v1/auth";
 import {
   apiError,
@@ -44,11 +45,20 @@ export async function POST(request: Request) {
       return apiError("user_not_found", "Пользователь не найден", 401);
     }
 
+    if (payload.ver && payload.ver !== tokenFingerprint(user.passwordHash, user.role)) {
+      return apiError(
+        "invalid_refresh_token",
+        "Токен обновления отозван (пароль или роль были изменены)",
+        401,
+      );
+    }
+
     const tokens = await createAuthTokens({
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
+      passwordHash: user.passwordHash,
     });
 
     return apiSuccess({ tokens });

@@ -4,11 +4,17 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { getDb } from "@/server/db";
-import { users, type User } from "@/server/db/schema";
-import { readSession, sessionCookie, signSession, type SessionUser } from "./jwt";
+import { businesses, users, type User } from "@/server/db/schema";
+import {
+  readSession,
+  sessionCookie,
+  signSession,
+  tokenFingerprint,
+  type SessionUser,
+} from "./jwt";
 
 export async function hashPassword(password: string) {
-  return bcrypt.hash(password, 10);
+  return bcrypt.hash(password, 12);
 }
 
 export async function verifyPassword(password: string, hash: string) {
@@ -26,6 +32,7 @@ export async function setSessionCookie(user: User) {
     email: user.email,
     name: user.name,
     role: user.role,
+    ver: tokenFingerprint(user.passwordHash, user.role),
   });
   const store = await cookies();
   store.set(sessionCookie.name, token, {
@@ -46,15 +53,18 @@ export async function requireUser(): Promise<SessionUser> {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  // A JWT can outlive the user row (e.g. the database was reset). Never trust it blindly.
+  // Verify the user still exists and neither password nor role was rotated.
   const db = await getDb();
   const [row] = await db
-    .select({ id: users.id, role: users.role })
+    .select({ id: users.id, role: users.role, passwordHash: users.passwordHash })
     .from(users)
     .where(eq(users.id, session.id))
     .limit(1);
 
   if (!row) redirect("/login");
+  if (session.ver && session.ver !== tokenFingerprint(row.passwordHash, row.role)) {
+    redirect("/login");
+  }
   return row.role === session.role ? session : { ...session, role: row.role };
 }
 
@@ -69,14 +79,17 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!session) return null;
   const db = await getDb();
   const [row] = await db.select().from(users).where(eq(users.id, session.id)).limit(1);
-  return row ?? null;
+  if (!row) return null;
+  if (session.ver && session.ver !== tokenFingerprint(row.passwordHash, row.role)) {
+    return null;
+  }
+  return row;
 }
 
 /** Owner's first business (MVP: one business per account). */
 export async function getMyBusiness() {
   const session = await requireUser();
   const db = await getDb();
-  const { businesses } = await import("@/server/db/schema");
   const [business] = await db
     .select()
     .from(businesses)
