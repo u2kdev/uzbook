@@ -16,7 +16,11 @@ const nextConfig: NextConfig = {
     "/*": ["./.data/**/*", "./.env", "./.env.*"],
   },
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "**" }],
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "t.me" },
+      { protocol: "https", hostname: "*.telegram.org" },
+    ],
   },
   experimental: {
     serverActions: {
@@ -25,13 +29,46 @@ const nextConfig: NextConfig = {
     },
   },
   async headers() {
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://telegram.org https://unpkg.com",
+      "style-src 'self' 'unsafe-inline' https://unpkg.com",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      "connect-src 'self' https://api.telegram.org",
+      "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org",
+      "form-action 'self' https://checkout.paycom.uz https://my.click.uz",
+      "base-uri 'self'",
+      "object-src 'none'",
+    ].join("; ");
+
     return [
+      {
+        source: "/b/:path*",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+        ],
+      },
+      {
+        source: "/pay/:path*",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+        ],
+      },
       {
         source: "/:path*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: csp,
+          },
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",

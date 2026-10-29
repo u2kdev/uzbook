@@ -41,6 +41,9 @@ export async function uploadGalleryImageAction(formData: FormData): Promise<Gall
   const { business, db } = await currentBusiness();
   if (!business) return { error: "Сначала создайте бизнес" };
 
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
   const after = formData.get("after");
   const before = formData.get("before");
   const caption = String(formData.get("caption") ?? "").trim().slice(0, 160);
@@ -54,9 +57,12 @@ export async function uploadGalleryImageAction(formData: FormData): Promise<Gall
   const limitError = await storageLimitError(business, extraBytes);
   if (limitError) return { error: limitError };
 
+  let afterUrl: string | null = null;
+  let beforeUrl: string | null = null;
+
   try {
     const saved = await saveImage(after);
-    let beforeUrl: string | null = null;
+    afterUrl = saved.url;
 
     if (before instanceof File && before.size > 0) {
       const savedBefore = await saveImage(before);
@@ -70,7 +76,7 @@ export async function uploadGalleryImageAction(formData: FormData): Promise<Gall
 
     await db.insert(galleryImages).values({
       businessId: business.id,
-      url: saved.url,
+      url: afterUrl,
       beforeUrl,
       caption: caption || null,
       sortOrder: Number(nextOrder) || 0,
@@ -79,6 +85,8 @@ export async function uploadGalleryImageAction(formData: FormData): Promise<Gall
     refresh(business.slug);
     return { ok: true };
   } catch (error) {
+    if (afterUrl) await deleteUpload(afterUrl);
+    if (beforeUrl) await deleteUpload(beforeUrl);
     return { error: error instanceof Error ? error.message : "Не удалось загрузить фото" };
   }
 }
@@ -132,8 +140,10 @@ export async function reorderGalleryAction(ids: string[]): Promise<GalleryState>
   const blocked = writeBlockedReason(business);
   if (blocked) return { error: blocked };
 
+  const safeIds = Array.isArray(ids) ? ids.slice(0, 100) : [];
+
   await db.transaction(async (tx) => {
-    for (const [index, id] of ids.entries()) {
+    for (const [index, id] of safeIds.entries()) {
       await tx
         .update(galleryImages)
         .set({ sortOrder: index })

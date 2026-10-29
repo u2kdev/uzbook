@@ -12,6 +12,61 @@ const MIME_EXT: Record<string, string> = {
   "image/gif": "gif",
 };
 
+/**
+ * Inspects magic bytes of the uploaded buffer to verify it is a genuine
+ * JPEG, PNG, GIF, or WebP image (prevents MIME-type spoofing).
+ */
+function detectImageExt(buf: Buffer): string | null {
+  if (buf.length < 12) return null;
+
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return "jpg";
+  }
+
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buf[0] === 0x89 &&
+    buf[1] === 0x50 &&
+    buf[2] === 0x4e &&
+    buf[3] === 0x47 &&
+    buf[4] === 0x0d &&
+    buf[5] === 0x0a &&
+    buf[6] === 0x1a &&
+    buf[7] === 0x0a
+  ) {
+    return "png";
+  }
+
+  // GIF: "GIF87a" or "GIF89a"
+  if (
+    buf[0] === 0x47 &&
+    buf[1] === 0x49 &&
+    buf[2] === 0x46 &&
+    buf[3] === 0x38 &&
+    (buf[4] === 0x37 || buf[4] === 0x39) &&
+    buf[5] === 0x61
+  ) {
+    return "gif";
+  }
+
+  // WebP: "RIFF" .... "WEBP"
+  if (
+    buf[0] === 0x52 &&
+    buf[1] === 0x49 &&
+    buf[2] === 0x46 &&
+    buf[3] === 0x46 &&
+    buf[8] === 0x57 &&
+    buf[9] === 0x45 &&
+    buf[10] === 0x42 &&
+    buf[11] === 0x50
+  ) {
+    return "webp";
+  }
+
+  return null;
+}
+
 export type StoredFile = { url: string; name: string; bytes: number };
 
 /**
@@ -22,15 +77,21 @@ export async function saveImage(file: File): Promise<StoredFile> {
   if (!file || file.size === 0) throw new Error("Файл не выбран");
   if (file.size > MAX_BYTES) throw new Error("Файл больше 5 МБ");
 
-  const ext = MIME_EXT[file.type];
-  if (!ext) throw new Error("Поддерживаются JPG, PNG, WebP и GIF");
+  if (!MIME_EXT[file.type]) {
+    throw new Error("Поддерживаются JPG, PNG, WebP и GIF");
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const ext = detectImageExt(buffer);
+  if (!ext) {
+    throw new Error("Повреждённый файл или неподдерживаемый формат изображения");
+  }
 
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
   const name = `${randomUUID()}.${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
   await fs.writeFile(path.join(UPLOAD_DIR, name), buffer);
 
-  return { url: `/api/uploads/${name}`, name, bytes: file.size };
+  return { url: `/api/uploads/${name}`, name, bytes: buffer.length };
 }
 
 /** Resolves an upload name to an absolute path, guarding against traversal. */

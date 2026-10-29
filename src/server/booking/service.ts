@@ -307,7 +307,17 @@ export async function cancelBooking(
     .where(eq(bookings.manageToken, token))
     .limit(1);
   if (!booking) return { ok: false, error: "booking_not_found" };
-  if (booking.status === "CANCELLED") return { ok: false, error: "booking_cancelled" };
+  if (
+    booking.status === "CANCELLED" ||
+    booking.status === "COMPLETED" ||
+    booking.status === "NO_SHOW"
+  ) {
+    return { ok: false, error: "booking_cancelled" };
+  }
+
+  if (booking.endAt.getTime() < Date.now()) {
+    return { ok: false, error: "booking_cancelled" };
+  }
 
   await db
     .update(bookings)
@@ -340,7 +350,16 @@ export async function rescheduleBooking(
     .where(eq(bookings.manageToken, token))
     .limit(1);
   if (!booking) return { ok: false, error: "booking_not_found" };
-  if (booking.status === "CANCELLED") return { ok: false, error: "booking_cancelled" };
+  if (
+    booking.status === "CANCELLED" ||
+    booking.status === "COMPLETED" ||
+    booking.status === "NO_SHOW"
+  ) {
+    return { ok: false, error: "booking_cancelled" };
+  }
+  if (booking.endAt.getTime() < Date.now()) {
+    return { ok: false, error: "booking_cancelled" };
+  }
 
   const [business] = await db
     .select()

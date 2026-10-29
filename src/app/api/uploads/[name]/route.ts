@@ -26,6 +26,9 @@ export async function GET(
     return new NextResponse(new Uint8Array(file), {
       headers: {
         "content-type": MIME[ext] ?? "application/octet-stream",
+        "x-content-type-options": "nosniff",
+        "content-disposition": `inline; filename="${name}"`,
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
         "cache-control": "public, max-age=31536000, immutable",
       },
     });
