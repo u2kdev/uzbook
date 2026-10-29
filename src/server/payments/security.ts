@@ -43,10 +43,20 @@ export function sanitizePaymentPayload(obj: unknown): unknown {
 const failureCounts = new Map<string, { count: number; firstAt: number }>();
 const FAILURE_THRESHOLD = 10;
 const FAILURE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+let lastFailureSweep = 0;
 
 export function trackWebhookFailure(provider: string, reason: string, ip?: string): void {
-  const key = `${provider}:${ip || "global"}`;
   const now = Date.now();
+  if (now - lastFailureSweep > 60_000) {
+    for (const [k, entry] of failureCounts) {
+      if (now - entry.firstAt > FAILURE_WINDOW_MS) {
+        failureCounts.delete(k);
+      }
+    }
+    lastFailureSweep = now;
+  }
+
+  const key = `${provider}:${ip || "global"}`;
   const current = failureCounts.get(key);
 
   if (!current || now - current.firstAt > FAILURE_WINDOW_MS) {

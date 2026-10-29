@@ -72,6 +72,8 @@ export function validateProductionEnv(env: NodeJS.ProcessEnv = process.env): Env
   const payme = [value(env, "PAYME_MERCHANT_ID"), value(env, "PAYME_KEY")];
   if (payme.some(Boolean) && !payme.every(Boolean)) {
     errors.push("Payme is partially configured: set both PAYME_MERCHANT_ID and PAYME_KEY.");
+  } else if (payme.every(Boolean) && !value(env, "PAYME_IP_ALLOWLIST")) {
+    warnings.push("PAYME_IP_ALLOWLIST is empty: set Payme webhook subnet allowlist in production.");
   }
 
   const click = [
@@ -83,6 +85,8 @@ export function validateProductionEnv(env: NodeJS.ProcessEnv = process.env): Env
     errors.push(
       "Click is partially configured: set CLICK_SERVICE_ID, CLICK_MERCHANT_ID and CLICK_SECRET_KEY.",
     );
+  } else if (click.every(Boolean) && !value(env, "CLICK_IP_ALLOWLIST")) {
+    warnings.push("CLICK_IP_ALLOWLIST is empty: set Click webhook subnet allowlist in production.");
   }
 
   const cryptoFlag = value(env, "PAYMENTS_CRYPTO").toLowerCase();
