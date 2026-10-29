@@ -61,9 +61,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             name="password"
             type="password"
             autoComplete={mode === "login" ? "current-password" : "new-password"}
-            placeholder="Минимум 6 символов"
+            placeholder={mode === "login" ? "Минимум 6 символов" : "Минимум 8 символов"}
             className="input-base"
-            minLength={6}
+            minLength={mode === "login" ? 6 : 8}
+            maxLength={128}
             required
           />
         </div>

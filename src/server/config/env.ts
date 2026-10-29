@@ -66,7 +66,11 @@ export function validateProductionEnv(env: NodeJS.ProcessEnv = process.env): Env
 
   const demoFlag = value(env, "PAYMENTS_DEMO").toLowerCase();
   if (["on", "true", "1", "yes"].includes(demoFlag)) {
-    warnings.push("PAYMENTS_DEMO is on: free test payments are enabled. Turn it off before public launch.");
+    if (value(env, "ALLOW_PRODUCTION_DEMO_PAYMENTS").toLowerCase() === "on") {
+      warnings.push("PAYMENTS_DEMO is on with ALLOW_PRODUCTION_DEMO_PAYMENTS=on: free test payments are enabled.");
+    } else {
+      errors.push("PAYMENTS_DEMO must be off in production (or set ALLOW_PRODUCTION_DEMO_PAYMENTS=on for a staging demo).");
+    }
   }
 
   const payme = [value(env, "PAYME_MERCHANT_ID"), value(env, "PAYME_KEY")];

@@ -42,15 +42,20 @@ export function telegramPaymentsEnabled(): boolean {
 }
 
 /**
- * Test payments activate a plan for free. They are enabled automatically in
- * development and can be switched on explicitly with PAYMENTS_DEMO=on.
- * In production set PAYMENTS_DEMO=off once real acquiring is connected.
+ * Test payments activate a plan for free. They require an explicit
+ * `PAYMENTS_DEMO=on` flag and are blocked in production unless
+ * `ALLOW_PRODUCTION_DEMO_PAYMENTS=on` is also set.
  */
 export function demoPaymentsEnabled(): boolean {
-  const flag = process.env.PAYMENTS_DEMO?.trim().toLowerCase();
-  if (["off", "false", "0", "no"].includes(flag ?? "")) return false;
-  if (["on", "true", "1", "yes"].includes(flag ?? "")) return true;
-  return process.env.NODE_ENV !== "production";
+  const flag = process.env.PAYMENTS_DEMO?.trim().toLowerCase() ?? "";
+  if (!["on", "true", "1", "yes"].includes(flag)) return false;
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.ALLOW_PRODUCTION_DEMO_PAYMENTS?.trim().toLowerCase() !== "on"
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export function cryptoPaymentsEnabled(): boolean {

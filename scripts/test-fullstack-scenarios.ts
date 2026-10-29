@@ -260,6 +260,7 @@ async function run() {
   // 7. Прошла оплата DEMO и тариф активировался
   // ------------------------------------------------------------------
   console.log(`[Scenario 7] Оплата DEMO и автоматическая активация тарифа...`);
+  process.env.PAYMENTS_DEMO = "on";
   const { payment, url } = await createPayment({
     business,
     plan: "PRO",

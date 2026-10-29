@@ -29,6 +29,9 @@ async function run() {
   if (!process.env.CRYPTO_DEPOSIT_ADDRESS) {
     process.env.CRYPTO_DEPOSIT_ADDRESS = "TTestMockAddressForLifecycleScript123";
   }
+  if (!process.env.PAYMENTS_DEMO) {
+    process.env.PAYMENTS_DEMO = "on";
+  }
   const isCryptoEnabled = cryptoPaymentsEnabled();
   const depositConfig = cryptoDepositConfig();
   console.log(`   ✓ Crypto enabled: ${isCryptoEnabled}, Asset: ${depositConfig.asset}, Network: ${depositConfig.network}`);

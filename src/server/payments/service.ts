@@ -14,6 +14,7 @@ import {
   buildClickCheckoutUrl,
   buildPaymeCheckoutUrl,
   createTelegramInvoice,
+  demoPaymentsEnabled,
   type PaymentProviderId,
 } from "./config";
 import { logger } from "@/server/logger";
@@ -89,7 +90,11 @@ export async function createPayment(params: {
       cryptoAmount,
       rateUzs: conf.rateUzs,
     };
-  } else if (provider !== "DEMO") {
+  } else if (provider === "DEMO") {
+    if (!demoPaymentsEnabled()) {
+      throw new Error("Тестовые платежи отключены");
+    }
+  } else {
     throw new Error("Этот способ оплаты пока не поддерживается");
   }
 
