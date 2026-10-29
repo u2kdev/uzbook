@@ -20,7 +20,7 @@ services:
       # Production default: never enable free test payments by accident.
       PAYMENTS_DEMO: "off"
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     volumes:
       - app_data:/app/.data
 

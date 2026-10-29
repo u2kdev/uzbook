@@ -65,6 +65,9 @@ services:
         condition: service_healthy
       app:
         condition: service_healthy
+    volumes:
+      # The upload cleanup task must see the same files as the app.
+      - uploads:/app/.data/uploads
     command:
       [
         "sh",

@@ -16,6 +16,13 @@ try {
 
 type JournalEntry = { idx: number; when: number; tag: string };
 
+function pgliteDataDir(): string {
+  const configured = process.env.PGLITE_DATA_DIR?.trim();
+  return configured
+    ? path.resolve(process.cwd(), configured)
+    : path.resolve(process.cwd(), ".data", "pg");
+}
+
 async function main() {
   if (process.env.DATABASE_URL?.trim()) {
     console.log("DATABASE_URL is set — run npm run db:migrate instead.");
@@ -27,7 +34,7 @@ async function main() {
     readFileSync(path.join(folder, "meta", "_journal.json"), "utf-8"),
   ) as { entries: JournalEntry[] };
 
-  const client = new PGlite(path.resolve(process.cwd(), ".data", "pg"));
+  const client = new PGlite(pgliteDataDir());
 
   await client.exec(`CREATE SCHEMA IF NOT EXISTS "drizzle"`);
   await client.exec(`CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (

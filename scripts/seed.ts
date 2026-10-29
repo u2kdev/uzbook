@@ -326,8 +326,8 @@ async function main() {
       console.log("Added default page sections to existing demo business");
     }
     console.log("Demo business already exists:", slug);
-    console.log("Platform owner: owner@uzbook.online / owner1234");
-    console.log("Admin: admin@uzbook.online / admin1234");
+    console.log("Salon owner: owner@uzbook.online / owner1234");
+    console.log("Platform admin: admin@uzbook.online / admin1234");
     console.log("Support: support@uzbook.online / support1234");
     return;
   }

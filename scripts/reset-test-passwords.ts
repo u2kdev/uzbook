@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb, closeDb } from "../src/server/db";
 import { users, businesses, subscriptions } from "../src/server/db/schema";
 
@@ -7,6 +7,16 @@ try {
   process.loadEnvFile?.(".env");
 } catch {
   /* .env is optional */
+}
+
+if (
+  process.env.NODE_ENV === "production" &&
+  process.env.ALLOW_TEST_PASSWORD_RESET !== "on"
+) {
+  console.error(
+    "Test password reset is disabled in production. Set ALLOW_TEST_PASSWORD_RESET=on only for an intentional demo reset.",
+  );
+  process.exit(1);
 }
 
 async function main() {
@@ -115,6 +125,15 @@ async function main() {
       .where(eq(businesses.id, atelier.id));
 
     const periodEnd = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+    await db
+      .update(subscriptions)
+      .set({ status: "CANCELLED" })
+      .where(
+        and(
+          eq(subscriptions.businessId, atelier.id),
+          inArray(subscriptions.status, ["ACTIVE", "PENDING"]),
+        ),
+      );
     await db.insert(subscriptions).values({
       businessId: atelier.id,
       plan: "PRO",

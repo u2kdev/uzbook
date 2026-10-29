@@ -72,10 +72,11 @@ npm run dev            # http://localhost:3000
 
 | Роль | Email | Пароль |
 | --- | --- | --- |
-| Владелец платформы | `owner@uzbook.online` | `owner1234` |
-| Админ | `admin@uzbook.online` | `admin1234` |
+| Владелец салона Atelier Noir | `owner@uzbook.online` | `owner1234` |
+| Администратор платформы | `admin@uzbook.online` | `admin1234` |
 | Поддержка | `support@uzbook.online` | `support1234` |
-| Владелец салона | `demo@uzbook.online` | `demo1234` |
+| Владелец демо-салона | `demo@uzbook.online` | `demo1234` |
+| Владелец Barber House | `barber@uzbook.online` | `barber1234` |
 
 В production демо-пользователи не создаются. Первого администратора создайте
 из своих значений:
@@ -87,9 +88,9 @@ npm run admin:create
 
 Демо-страницы записи: http://localhost:3000/atelier-noir и http://localhost:3000/barber-house
 
-После входа владельцу платформы доступна админка `/admin`: MRR, бизнесы, пользователи и
-подтверждение оплат по тарифам. Владелец салона видит конструктор страницы в
-`/dashboard/profile` (основное, блоки, дизайн, галерея, QR-код).
+После входа администратору платформы (`admin@uzbook.online`) доступна админка `/admin`:
+MRR, бизнесы, пользователи и подтверждение оплат по тарифам. Владелец салона видит
+конструктор страницы в `/dashboard/profile` (основное, блоки, дизайн, галерея, QR-код).
 
 ## Telegram-бот
 

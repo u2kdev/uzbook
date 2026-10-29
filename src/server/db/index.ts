@@ -14,24 +14,34 @@ const globalForDb = globalThis as unknown as {
   __uzbookDb?: DB;
   __uzbookDbReady?: Promise<DB>;
   __uzbookPglite?: PGlite;
+  __uzbookPg?: ReturnType<typeof postgres>;
 };
 
 const migrationsFolder = path.resolve(process.cwd(), "drizzle");
+
+function pgliteDataDir(): string {
+  const configured = process.env.PGLITE_DATA_DIR?.trim();
+  return configured
+    ? path.resolve(/*turbopackIgnore: true*/ process.cwd(), configured)
+    : path.resolve(process.cwd(), ".data", "pg");
+}
 
 async function createDb(): Promise<DB> {
   const url = process.env.DATABASE_URL?.trim();
 
   if (!url) {
     // Zero-install local development: embedded Postgres (WASM), data in ./.data/pg
-    const dataDir = path.resolve(process.cwd(), ".data", "pg");
+    const dataDir = pgliteDataDir();
     mkdirSync(path.dirname(dataDir), { recursive: true });
     const client = new PGlite(dataDir);
     globalForDb.__uzbookPglite = client;
     const db = drizzlePglite(client, { schema, casing: "snake_case" });
+    await migratePglite(db, { migrationsFolder });
     return db as unknown as DB;
   }
 
   const client = postgres(url, { max: 10, prepare: false });
+  globalForDb.__uzbookPg = client;
   const db = drizzlePostgres(client, { schema, casing: "snake_case" });
 
   // Locally migrations are applied automatically for convenience. In production
@@ -73,9 +83,13 @@ export async function closeDb(): Promise<void> {
   if (globalForDb.__uzbookPglite) {
     await globalForDb.__uzbookPglite.close();
     delete globalForDb.__uzbookPglite;
-    delete globalForDb.__uzbookDbReady;
-    delete globalForDb.__uzbookDb;
   }
+  if (globalForDb.__uzbookPg) {
+    await globalForDb.__uzbookPg.end({ timeout: 5 });
+    delete globalForDb.__uzbookPg;
+  }
+  delete globalForDb.__uzbookDbReady;
+  delete globalForDb.__uzbookDb;
 }
 
 export { schema };

@@ -1,5 +1,10 @@
 export type PlanId = "TRIAL" | "START" | "PRO" | "BUSINESS";
 
+export const TRIAL_DAYS = 14;
+export const SUBSCRIPTION_PERIOD_DAYS = 30;
+export const TRIAL_MS = TRIAL_DAYS * 24 * 60 * 60 * 1000;
+export const SUBSCRIPTION_PERIOD_MS = SUBSCRIPTION_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+
 export type Plan = {
   id: PlanId;
   name: string;

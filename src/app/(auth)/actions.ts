@@ -15,6 +15,7 @@ import {
   verifyPassword,
 } from "@/server/auth/session";
 import { rateLimit } from "@/server/http/rate-limit";
+import { TRIAL_MS } from "@/lib/plans";
 import { isValidSlug, slugify } from "@/lib/slug";
 import { logger } from "@/server/logger";
 
@@ -188,7 +189,7 @@ export async function createBusinessAction(
     .limit(1);
   if (taken) return { fieldErrors: { slug: "Этот адрес уже занят. Выберите другой." } };
 
-  const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  const trialEndsAt = new Date(Date.now() + TRIAL_MS);
 
   await db.transaction(async (tx) => {
     const [business] = await tx

@@ -16,6 +16,13 @@ try {
 const folder = path.resolve(process.cwd(), "drizzle");
 const url = process.env.DATABASE_URL?.trim();
 
+function pgliteDataDir(): string {
+  const configured = process.env.PGLITE_DATA_DIR?.trim();
+  return configured
+    ? path.resolve(process.cwd(), configured)
+    : path.resolve(process.cwd(), ".data", "pg");
+}
+
 async function main() {
   if (url) {
     const client = postgres(url, { max: 1 });
@@ -23,7 +30,7 @@ async function main() {
     await client.end();
     console.log("Migrations applied to", url.replace(/\/\/.*@/, "//***@"));
   } else {
-    const dataDir = path.resolve(process.cwd(), ".data", "pg");
+    const dataDir = pgliteDataDir();
     mkdirSync(path.dirname(dataDir), { recursive: true });
     const client = new PGlite(dataDir);
     await migrate(drizzle(client), { migrationsFolder: folder });

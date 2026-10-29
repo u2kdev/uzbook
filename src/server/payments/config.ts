@@ -129,7 +129,6 @@ export function providerLabel(provider: string): string {
     DEMO: "Тестовый платёж",
     MANUAL: "Перевод вручную",
     CRYPTO: "Криптовалюта",
-    STRIPE: "Stripe",
   }[provider] ?? provider;
 }
 

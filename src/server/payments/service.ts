@@ -9,7 +9,12 @@ import {
   type Business,
   type Payment,
 } from "@/server/db/schema";
-import { planById, type PlanId } from "@/lib/plans";
+import {
+  planById,
+  SUBSCRIPTION_PERIOD_DAYS,
+  SUBSCRIPTION_PERIOD_MS,
+  type PlanId,
+} from "@/lib/plans";
 import {
   buildClickCheckoutUrl,
   buildPaymeCheckoutUrl,
@@ -20,8 +25,8 @@ import {
 import { logger } from "@/server/logger";
 import { notifyPaymentCompleted } from "@/server/telegram/notify";
 
-const PERIOD_DAYS = 30;
-const PERIOD_MS = PERIOD_DAYS * 24 * 60 * 60 * 1000;
+const PERIOD_DAYS = SUBSCRIPTION_PERIOD_DAYS;
+const PERIOD_MS = SUBSCRIPTION_PERIOD_MS;
 
 export type PaymentWithBusiness = { payment: Payment; business: Business };
 

@@ -74,9 +74,8 @@ export function handleApiError(err: unknown) {
     );
   }
 
-  const message = err instanceof Error ? err.message : "Неизвестная ошибка сервера";
   console.error("Unhandled API v1 Error:", err);
-  return apiError("internal_error", message, 500);
+  return apiError("internal_error", "Внутренняя ошибка сервера", 500);
 }
 
 export function checkApiRateLimit(
