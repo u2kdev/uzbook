@@ -19,6 +19,7 @@ export type RequestRow = {
   businessSlug: string;
   ownerName: string;
   ownerEmail: string;
+  ownerPhone?: string | null;
   amount: number;
   currency: string;
   createdAt: string;
@@ -80,7 +81,8 @@ export function RequestList({
               </span>
             </p>
             <p className="mt-0.5 truncate text-[11px] text-muted">
-              {request.ownerName} · {request.ownerEmail} ·{" "}
+              {request.ownerName} · {request.ownerEmail}
+              {request.ownerPhone ? ` · 📞 ${request.ownerPhone}` : ""} ·{" "}
               {new Intl.DateTimeFormat("ru-RU", {
                 day: "2-digit",
                 month: "short",

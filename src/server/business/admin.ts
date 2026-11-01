@@ -20,6 +20,7 @@ export type AdminBusinessRow = {
   business: Business;
   ownerName: string;
   ownerEmail: string;
+  ownerPhone: string | null;
   providerName: string | null;
   pending: Subscription | null;
   active: Subscription | null;
@@ -32,6 +33,7 @@ export async function getAdminBusinesses(): Promise<AdminBusinessRow[]> {
       business: businesses,
       ownerName: users.name,
       ownerEmail: users.email,
+      ownerPhone: users.phone,
     })
     .from(businesses)
     .innerJoin(users, eq(businesses.ownerId, users.id))
@@ -69,6 +71,7 @@ export type PendingRequestRow = {
   businessStatus: Business["status"];
   ownerName: string;
   ownerEmail: string;
+  ownerPhone: string | null;
   providerName?: string | null;
   providerPayoutCard?: string | null;
 };
@@ -83,6 +86,7 @@ export async function getPendingRequests(): Promise<PendingRequestRow[]> {
       businessStatus: businesses.status,
       ownerName: users.name,
       ownerEmail: users.email,
+      ownerPhone: users.phone,
     })
     .from(subscriptions)
     .innerJoin(businesses, eq(subscriptions.businessId, businesses.id))

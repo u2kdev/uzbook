@@ -300,10 +300,11 @@ export function ProviderDashboard({
                     />
                   </div>
                   <div>
-                    <label className="label-base">Телефон салона / владельца</label>
+                    <label className="label-base">Телефон владельца (для связи и входа) *</label>
                     <input
                       name="ownerPhone"
                       type="tel"
+                      required
                       placeholder="+998 90 123 45 67"
                       className="input-base"
                     />

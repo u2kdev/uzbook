@@ -73,6 +73,7 @@ export function UserTable({
       return (
         row.name.toLowerCase().includes(search) ||
         row.email.toLowerCase().includes(search) ||
+        (row.phone && row.phone.toLowerCase().includes(search)) ||
         (row.username && row.username.toLowerCase().includes(search)) ||
         row.businessNames.some((name) => name.toLowerCase().includes(search))
       );
@@ -162,7 +163,7 @@ export function UserTable({
                 </p>
                 <p className="mt-0.5 truncate text-[10.5px] text-muted">
                   {row.email}
-                  {row.phone ? ` · ${row.phone}` : ""}
+                  {row.phone ? ` · 📞 ${row.phone}` : ""}
                   {row.payoutCard ? ` · 💳 ${row.payoutCard}` : ""}
                 </p>
               </div>

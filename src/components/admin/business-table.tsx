@@ -29,6 +29,7 @@ export type AdminBusinessItem = {
   createdAt: string;
   ownerName: string;
   ownerEmail: string;
+  ownerPhone?: string | null;
   providerName?: string | null;
   customStaffLimit?: number | null;
   customClientLimit?: number | null;
@@ -71,7 +72,8 @@ export function BusinessTable({
         row.name.toLowerCase().includes(search) ||
         row.slug.toLowerCase().includes(search) ||
         row.ownerEmail.toLowerCase().includes(search) ||
-        row.ownerName.toLowerCase().includes(search)
+        row.ownerName.toLowerCase().includes(search) ||
+        (row.ownerPhone && row.ownerPhone.toLowerCase().includes(search))
       );
     });
   }, [rows, query, filter]);
@@ -154,6 +156,7 @@ export function BusinessTable({
                   </div>
                   <p className="mt-0.5 truncate text-[11px] text-muted">
                     {row.ownerName} · {row.ownerEmail}
+                    {row.ownerPhone ? ` · 📞 ${row.ownerPhone}` : ""}
                     {row.providerName ? ` · 🤝 Провайдер: ${row.providerName}` : ""}
                     {row.customStaffLimit ? ` · до ${row.customStaffLimit} сотр.` : ""}
                     {row.customClientLimit ? ` · до ${row.customClientLimit} кл.` : ""}

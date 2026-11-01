@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import {
   businesses,
@@ -13,6 +13,14 @@ import { hashPassword, requireAdmin, requireProvider } from "@/server/auth/sessi
 import { isValidSlug, slugify } from "@/lib/slug";
 import { recordAuditLog } from "@/server/payments/service";
 import type { PlanId } from "@/lib/plans";
+
+function normalizePhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 9) return `+998${digits}`;
+  if (digits.length >= 7) return `+${digits}`;
+  return "";
+}
 
 export type ProviderActionState = {
   ok?: boolean;
@@ -113,7 +121,8 @@ export async function createOrApproveProviderAction(
     .toLowerCase()
     .replace(/\s+/g, "");
   const password = String(formData.get("password") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim() || null;
+  const rawPhone = String(formData.get("phone") ?? "").trim();
+  const phone = rawPhone ? normalizePhone(rawPhone) || rawPhone : null;
   const rawEmail = String(formData.get("email") ?? "").trim().toLowerCase();
   const email = rawEmail || `${username}@provider.uzbook.online`;
   const payoutCard = String(formData.get("payoutCard") ?? "").trim() || null;
@@ -301,7 +310,9 @@ export async function providerConnectClientAction(
   const ownerName = String(formData.get("ownerName") ?? "").trim();
   const ownerEmail = String(formData.get("ownerEmail") ?? "").trim().toLowerCase();
   const ownerPassword = String(formData.get("ownerPassword") ?? "").trim();
-  const ownerPhone = String(formData.get("ownerPhone") ?? "").trim() || null;
+  const rawOwnerPhone = String(formData.get("ownerPhone") ?? "").trim();
+  const ownerPhone = normalizePhone(rawOwnerPhone);
+  const ownerPhoneDigits = ownerPhone.replace(/\D/g, "");
 
   const businessName = String(formData.get("businessName") ?? "").trim();
   const rawSlug = slugify(String(formData.get("slug") ?? businessName));
@@ -317,6 +328,9 @@ export async function providerConnectClientAction(
 
   if (ownerName.length < 2) return { error: "Укажите имя владельца салона" };
   if (!ownerEmail.includes("@")) return { error: "Укажите корректный email владельца для входа" };
+  if (!ownerPhone || ownerPhoneDigits.length < 7) {
+    return { error: "Укажите контактный телефон владельца салона (для связи и входа по номеру)" };
+  }
   if (ownerPassword.length < 6) return { error: "Пароль клиента должен быть минимум 6 символов" };
   if (businessName.length < 2) return { error: "Укажите название салона / бизнеса" };
   if (!isValidSlug(rawSlug)) {
@@ -326,9 +340,17 @@ export async function providerConnectClientAction(
   const [existingEmail] = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.email, ownerEmail))
+    .where(
+      or(
+        eq(users.email, ownerEmail),
+        eq(users.phone, ownerPhone),
+        sql`regexp_replace(coalesce(${users.phone}, ''), '[^0-9]', '', 'g') = ${ownerPhoneDigits}`,
+      ),
+    )
     .limit(1);
-  if (existingEmail) return { error: "Клиент с таким email уже зарегистрирован на платформе" };
+  if (existingEmail) {
+    return { error: "Клиент с таким email или телефоном уже зарегистрирован на платформе" };
+  }
 
   const [existingSlug] = await db
     .select({ id: businesses.id })

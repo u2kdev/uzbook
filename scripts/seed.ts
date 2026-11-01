@@ -36,25 +36,41 @@ async function main() {
       email: "owner@uzbook.online",
       name: "Мадина Каримова (Owner)",
       password: "owner1234",
+      phone: "+998901234567",
       role: "OWNER" as const,
+      username: null,
     },
     {
       email: "admin@uzbook.online",
       name: "Админ платформы",
       password: "admin1234",
+      phone: "+998900000001",
       role: "ADMIN" as const,
+      username: "admin",
     },
     {
       email: "support@uzbook.online",
       name: "Поддержка",
       password: "support1234",
+      phone: "+998900000002",
       role: "SUPPORT" as const,
+      username: "support",
     },
     {
       email: "demo@uzbook.online",
       name: "Мадина Каримова (Demo)",
       password: "demo1234",
+      phone: "+998901112233",
       role: "OWNER" as const,
+      username: null,
+    },
+    {
+      email: "provider@uzbook.online",
+      name: "Рустам Алимов (Provider)",
+      password: "provider1234",
+      phone: "+998907778899",
+      role: "PROVIDER" as const,
+      username: "provider1",
     },
   ];
 
@@ -64,13 +80,22 @@ async function main() {
       .insert(users)
       .values({
         email: account.email,
+        username: account.username,
+        phone: account.phone,
         name: account.name,
         passwordHash,
         role: account.role,
+        commissionPercent: account.role === "PROVIDER" ? 60 : 60,
+        payoutCard: account.role === "PROVIDER" ? "8600 1234 5678 9012" : null,
       })
       .onConflictDoUpdate({
         target: users.email,
-        set: { role: account.role, passwordHash },
+        set: {
+          role: account.role,
+          passwordHash,
+          phone: account.phone,
+          username: account.username,
+        },
       });
   }
 

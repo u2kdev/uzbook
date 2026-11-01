@@ -22,31 +22,54 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
       <form action={formAction} className="mt-8 space-y-4">
         {mode === "register" && (
-          <div>
-            <label htmlFor="name" className="label-base">
-              Ваше имя
-            </label>
-            <input
-              id="name"
-              name="name"
-              autoComplete="name"
-              placeholder="Мадина Каримова"
-              className="input-base"
-              required
-            />
-          </div>
+          <>
+            <div>
+              <label htmlFor="name" className="label-base">
+                Ваше имя
+              </label>
+              <input
+                id="name"
+                name="name"
+                autoComplete="name"
+                placeholder="Мадина Каримова"
+                className="input-base"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="phone" className="label-base">
+                Номер телефона
+              </label>
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                placeholder="+998 90 123 45 67"
+                className="input-base"
+                required
+              />
+            </div>
+          </>
         )}
 
         <div>
           <label htmlFor="email" className="label-base">
-            {mode === "login" ? "Email или никнейм (для провайдеров)" : "Email"}
+            {mode === "login"
+              ? "Телефон, Email или никнейм"
+              : "Email"}
           </label>
           <input
             id="email"
             name="email"
             type={mode === "login" ? "text" : "email"}
             autoComplete={mode === "login" ? "username" : "email"}
-            placeholder={mode === "login" ? "you@salon.uz или ваш никнейм" : "you@salon.uz"}
+            placeholder={
+              mode === "login"
+                ? "+998 90 123 45 67, email или никнейм"
+                : "you@salon.uz"
+            }
             className="input-base"
             required
           />

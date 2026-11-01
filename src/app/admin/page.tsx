@@ -124,6 +124,7 @@ export default async function AdminOverviewPage() {
               businessSlug: row.businessSlug,
               ownerName: row.ownerName,
               ownerEmail: row.ownerEmail,
+              ownerPhone: row.ownerPhone,
               amount: row.subscription.amount,
               currency: row.subscription.currency,
               createdAt: row.subscription.createdAt.toISOString(),
