@@ -13,6 +13,7 @@ import {
 import { requireUser } from "@/server/auth/session";
 import { zonedToUtc } from "@/server/booking/time";
 import { newManageToken } from "@/server/booking/service";
+import { currentBusinessForOwner, writeBlockedReason } from "@/server/limits";
 
 export type QuickActionResult = {
   ok: boolean;
@@ -33,14 +34,13 @@ export async function blockTimeAction(input: {
   const session = await requireUser();
   if (session.role !== "OWNER" && session.role !== "ADMIN") return { ok: false, error: "Нет доступа" };
 
-  const db = await getDb();
-  const [business] = await db
-    .select()
-    .from(businesses)
-    .where(eq(businesses.ownerId, session.id))
-    .limit(1);
-
+  const business = await currentBusinessForOwner(session.id);
   if (!business) return { ok: false, error: "Бизнес не найден" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { ok: false, error: blocked };
+
+  const db = await getDb();
 
   if (input.endMinute <= input.startMinute) {
     return { ok: false, error: "Время окончания должно быть позже времени начала" };
@@ -115,14 +115,13 @@ export async function toggleDayOffAction(input: {
   const session = await requireUser();
   if (session.role !== "OWNER" && session.role !== "ADMIN") return { ok: false, error: "Нет доступа" };
 
-  const db = await getDb();
-  const [business] = await db
-    .select()
-    .from(businesses)
-    .where(eq(businesses.ownerId, session.id))
-    .limit(1);
-
+  const business = await currentBusinessForOwner(session.id);
   if (!business) return { ok: false, error: "Бизнес не найден" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { ok: false, error: blocked };
+
+  const db = await getDb();
 
   const staffRows = await db
     .select({ id: staff.id })

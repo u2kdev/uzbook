@@ -61,7 +61,10 @@ export async function POST(
   }
 
   const session = await getSession();
-  const source: "WEB" | "MANUAL" = session ? "MANUAL" : "WEB";
+  const isAuthorizedOwner = Boolean(
+    session && (session.id === business.ownerId || session.role === "ADMIN"),
+  );
+  const source: "WEB" | "MANUAL" = isAuthorizedOwner ? "MANUAL" : "WEB";
 
   const result = await createBooking({
     business,

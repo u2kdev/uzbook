@@ -7,6 +7,7 @@ import { authSecret } from "@/server/config/env";
 import { getDb } from "@/server/db";
 import { businesses, users, type Business, type User } from "@/server/db/schema";
 import { tokenFingerprint, type SessionUser } from "@/server/auth/jwt";
+import { expireBusinessIfNeeded } from "@/server/limits";
 import { ApiError } from "./response";
 
 const ACCESS_TOKEN_TTL_SEC = 60 * 60; // 1 hour
@@ -205,6 +206,8 @@ export async function authenticateBearer(request: Request): Promise<{
     throw new ApiError(403, "no_business", "У аккаунта нет привязанного бизнеса или салона");
   }
 
+  const activeBusiness = await expireBusinessIfNeeded(businessRow);
+
   return {
     user: userRow,
     session: {
@@ -213,6 +216,6 @@ export async function authenticateBearer(request: Request): Promise<{
       name: userRow.name,
       role: userRow.role,
     },
-    business: businessRow,
+    business: activeBusiness,
   };
 }

@@ -188,14 +188,16 @@ export async function GET() {
           },
         },
         get: {
-          summary: "Поиск записей клиента по номеру телефона",
-          description: "Позволяет мобильному приложению получить список «Мои записи» клиента без регистрации.",
-          tags: ["Public Bookings"],
+          summary: "Поиск записей клиента по номеру телефона в салоне владельца",
+          description: "Позволяет авторизованному владельцу найти историю записей клиента по номеру телефона в своём салоне.",
+          tags: ["Owner Bookings"],
+          security: [{ BearerAuth: [] }],
           parameters: [
             { name: "phone", in: "query", required: true, schema: { type: "string", example: "+998901234567" } },
           ],
           responses: {
-            200: { description: "История записей клиента" },
+            200: { description: "История записей клиента в салоне" },
+            401: { description: "Требуется авторизация Bearer токеном" },
           },
         },
       },

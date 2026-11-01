@@ -1,10 +1,11 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/server/db";
 import { bookings, businesses, services, staff } from "@/server/db/schema";
 import { getBusinessBySlug } from "@/server/business/public";
 import { createBooking, normalizePhone } from "@/server/booking/service";
 import { appUrl } from "@/server/payments/config";
+import { authenticateBearer } from "@/server/api/v1/auth";
 import {
   apiError,
   apiSuccess,
@@ -122,6 +123,8 @@ export async function GET(request: Request) {
   if (rateLimitErr) return rateLimitErr;
 
   try {
+    const { business } = await authenticateBearer(request);
+
     const url = new URL(request.url);
     const rawPhone = url.searchParams.get("phone")?.trim();
 
@@ -135,7 +138,6 @@ export async function GET(request: Request) {
     const rows = await db
       .select({
         id: bookings.id,
-        manageToken: bookings.manageToken,
         status: bookings.status,
         startAt: bookings.startAt,
         endAt: bookings.endAt,
@@ -154,7 +156,7 @@ export async function GET(request: Request) {
       .innerJoin(services, eq(bookings.serviceId, services.id))
       .innerJoin(staff, eq(bookings.staffId, staff.id))
       .innerJoin(businesses, eq(bookings.businessId, businesses.id))
-      .where(eq(bookings.clientPhone, normalized))
+      .where(and(eq(bookings.businessId, business.id), eq(bookings.clientPhone, normalized)))
       .orderBy(desc(bookings.startAt))
       .limit(50);
 
@@ -163,8 +165,6 @@ export async function GET(request: Request) {
       count: rows.length,
       bookings: rows.map((r) => ({
         id: r.id,
-        manageToken: r.manageToken,
-        manageUrl: `${appUrl()}/b/${r.manageToken}`,
         status: r.status,
         startAt: r.startAt.toISOString(),
         endAt: r.endAt.toISOString(),

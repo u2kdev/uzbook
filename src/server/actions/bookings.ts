@@ -7,6 +7,7 @@ import { bookings, businesses, services, staff, staffServices } from "@/server/d
 import { requireUser } from "@/server/auth/session";
 import { createBooking } from "@/server/booking/service";
 import { recordAuditLog } from "@/server/payments/service";
+import { currentBusinessForOwner, writeBlockedReason } from "@/server/limits";
 
 export type StatusActionResult = { ok: boolean; error?: string };
 
@@ -18,15 +19,15 @@ export async function setBookingStatus(
   const session = await requireUser();
   if (session.role !== "OWNER" && session.role !== "ADMIN") return { ok: false, error: "Нет доступа" };
 
-  const db = await getDb();
-  const [business] = await db
-    .select({ id: businesses.id, name: businesses.name })
-    .from(businesses)
-    .where(eq(businesses.ownerId, session.id))
-    .limit(1);
-
+  const business = await currentBusinessForOwner(session.id);
   if (!business) return { ok: false, error: "Бизнес не найден" };
 
+  if (status !== "CANCELLED") {
+    const blocked = writeBlockedReason(business);
+    if (blocked) return { ok: false, error: blocked };
+  }
+
+  const db = await getDb();
   const cancelReason = reason?.trim().slice(0, 300) || "Отменено владельцем";
 
   const updated = await db
@@ -82,13 +83,13 @@ export async function createManualBookingAction(
   const session = await requireUser();
   if (session.role !== "OWNER" && session.role !== "ADMIN") return { error: "Нет доступа" };
 
-  const db = await getDb();
-  const [business] = await db
-    .select()
-    .from(businesses)
-    .where(eq(businesses.ownerId, session.id))
-    .limit(1);
+  const business = await currentBusinessForOwner(session.id);
   if (!business) return { error: "Сначала создайте бизнес" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
+
+  const db = await getDb();
 
   const staffId = String(formData.get("staffId") ?? "");
   const serviceId = String(formData.get("serviceId") ?? "");
@@ -148,13 +149,13 @@ export async function ownerRescheduleBookingAction(input: {
   const session = await requireUser();
   if (session.role !== "OWNER" && session.role !== "ADMIN") return { ok: false, error: "Нет доступа" };
 
-  const db = await getDb();
-  const [business] = await db
-    .select()
-    .from(businesses)
-    .where(eq(businesses.ownerId, session.id))
-    .limit(1);
+  const business = await currentBusinessForOwner(session.id);
   if (!business) return { ok: false, error: "Бизнес не найден" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { ok: false, error: blocked };
+
+  const db = await getDb();
 
   const [booking] = await db
     .select()

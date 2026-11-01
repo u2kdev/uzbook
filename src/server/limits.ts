@@ -92,14 +92,20 @@ export async function getSubscriptionInfo(business: Business): Promise<Subscript
   };
 }
 
-/** Returns an error message when the owner cannot create paid content. */
+/** Returns an error message when the owner cannot create paid content or accept new bookings. */
 export function writeBlockedReason(business: Business): string | null {
+  if (business.status === "SUSPENDED") {
+    return "Бизнес приостановлен администратором. Обратитесь в поддержку.";
+  }
+  if (business.status === "DRAFT") {
+    return "Бизнес не опубликован и находится в статусе черновика.";
+  }
   if (
     business.plan === "TRIAL" &&
     business.trialEndsAt &&
     business.trialEndsAt.getTime() < Date.now()
   ) {
-    return "Пробный период закончился. Подключите тариф, чтобы снова менять страницу, услуги и галерею.";
+    return "Пробный период закончился. Подключите тариф, чтобы продолжить работу.";
   }
   return null;
 }
@@ -187,7 +193,8 @@ export async function currentBusinessForOwner(ownerId: string) {
     .from(businesses)
     .where(eq(businesses.ownerId, ownerId))
     .limit(1);
-  return business ?? null;
+  if (!business) return null;
+  return expireBusinessIfNeeded(business);
 }
 
 /**

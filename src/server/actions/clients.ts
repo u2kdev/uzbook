@@ -6,7 +6,7 @@ import { getDb } from "@/server/db";
 import { bookings, businesses, clients, services, staff } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { createBooking } from "@/server/booking/service";
-import { clientLimitError } from "@/server/limits";
+import { clientLimitError, currentBusinessForOwner, writeBlockedReason } from "@/server/limits";
 
 export type ClientSummary = {
   id: string;
@@ -381,14 +381,13 @@ export async function updateClientNotesAction(phone: string, notes: string): Pro
   const session = await requireUser();
   if (session.role !== "OWNER" && session.role !== "ADMIN") return { ok: false, error: "Нет доступа" };
 
-  const db = await getDb();
-  const [business] = await db
-    .select({ id: businesses.id })
-    .from(businesses)
-    .where(eq(businesses.ownerId, session.id))
-    .limit(1);
-
+  const business = await currentBusinessForOwner(session.id);
   if (!business) return { ok: false, error: "Бизнес не найден" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { ok: false, error: blocked };
+
+  const db = await getDb();
 
   const existing = await db
     .select({ id: clients.id })
@@ -419,14 +418,13 @@ export async function saveClientAction(formData: FormData): Promise<{ ok: boolea
   const session = await requireUser();
   if (session.role !== "OWNER" && session.role !== "ADMIN") return { ok: false, error: "Нет доступа" };
 
-  const db = await getDb();
-  const [business] = await db
-    .select()
-    .from(businesses)
-    .where(eq(businesses.ownerId, session.id))
-    .limit(1);
-
+  const business = await currentBusinessForOwner(session.id);
   if (!business) return { ok: false, error: "Бизнес не найден" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { ok: false, error: blocked };
+
+  const db = await getDb();
 
   const name = String(formData.get("name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();

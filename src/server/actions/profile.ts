@@ -15,6 +15,7 @@ import { normalizeAuthPhone } from "@/lib/phone";
 import { isValidSlug, slugify } from "@/lib/slug";
 import { planById, type PlanId } from "@/lib/plans";
 import { recordAuditLog } from "@/server/payments/service";
+import { currentBusinessForOwner, writeBlockedReason } from "@/server/limits";
 
 export type ProfileState = {
   ok?: boolean;
@@ -27,12 +28,8 @@ async function myBusiness() {
   if (session.role !== "OWNER" && session.role !== "ADMIN") {
     throw new Error("Только владелец может менять настройки");
   }
+  const business = await currentBusinessForOwner(session.id);
   const db = await getDb();
-  const [business] = await db
-    .select()
-    .from(businesses)
-    .where(eq(businesses.ownerId, session.id))
-    .limit(1);
   return { business, db };
 }
 
@@ -81,6 +78,9 @@ export async function updateProfileAction(
 ): Promise<ProfileState> {
   const { business, db } = await myBusiness();
   if (!business) return { error: "Сначала создайте бизнес" };
+
+  const blocked = writeBlockedReason(business);
+  if (blocked) return { error: blocked };
 
   const parsed = profileSchema.safeParse({
     name: String(formData.get("name") ?? "").trim(),

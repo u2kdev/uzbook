@@ -218,8 +218,8 @@ export class MobileApiClient {
       count: number;
       bookings: Array<{
         id: string;
-        manageToken: string;
-        manageUrl: string;
+        manageToken?: string;
+        manageUrl?: string;
         status: string;
         startAt: string;
         endAt: string;
@@ -229,7 +229,7 @@ export class MobileApiClient {
         staff: { name: string };
         salon: { name: string; slug: string; address: string | null; phone: string | null };
       }>;
-    }>(`/bookings?${qs.toString()}`, { method: "GET" });
+    }>(`/bookings?${qs.toString()}`, { method: "GET" }, true);
   }
 
   async getBookingDetails(token: string) {

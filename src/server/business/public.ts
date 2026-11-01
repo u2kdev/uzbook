@@ -12,6 +12,7 @@ import {
 } from "@/server/db/schema";
 import { todayInZone } from "@/server/booking/time";
 import { getBatchPreviewSlotsForStaff, type TimeSlot } from "@/server/booking/slots";
+import { expireBusinessIfNeeded } from "@/server/limits";
 
 export type PublicPageSection = {
   id: string;
@@ -54,7 +55,8 @@ export async function getBusinessBySlug(slug: string): Promise<Business | null> 
     .from(businesses)
     .where(eq(businesses.slug, slug.toLowerCase()))
     .limit(1);
-  return row ?? null;
+  if (!row) return null;
+  return expireBusinessIfNeeded(row);
 }
 
 export async function getPublicBusiness(slug: string): Promise<PublicBusiness | null> {

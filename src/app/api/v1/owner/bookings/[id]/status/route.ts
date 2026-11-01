@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getDb } from "@/server/db";
 import { bookings } from "@/server/db/schema";
 import { authenticateBearer } from "@/server/api/v1/auth";
+import { writeBlockedReason } from "@/server/limits";
 import {
   apiError,
   apiSuccess,
@@ -40,6 +41,14 @@ export async function PATCH(
     }
 
     const { status, reason } = parsed.data;
+
+    if (status !== "CANCELLED") {
+      const blocked = writeBlockedReason(business);
+      if (blocked) {
+        return apiError("plan_limit_reached", blocked, 403);
+      }
+    }
+
     const db = await getDb();
 
     const [booking] = await db

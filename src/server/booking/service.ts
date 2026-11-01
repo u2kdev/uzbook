@@ -16,6 +16,7 @@ import { dateInZone } from "./time";
 import { getAvailableSlots } from "./slots";
 import { logger } from "@/server/logger";
 import { recordAuditLog } from "@/server/payments/service";
+import { writeBlockedReason } from "@/server/limits";
 
 export type BookingFailure =
   | "business_not_found"
@@ -54,6 +55,9 @@ export async function createBooking(input: {
   note?: string | null;
   source?: "WEB" | "MANUAL";
 }): Promise<Result<{ id: string; manageToken: string; startAt: Date; endAt: Date }>> {
+  const blocked = writeBlockedReason(input.business);
+  if (blocked) return { ok: false, error: "slot_unavailable" };
+
   const db = await getDb();
   const start = new Date(input.startAt);
   if (Number.isNaN(start.getTime())) return { ok: false, error: "invalid_input" };
@@ -397,7 +401,7 @@ export async function rescheduleBooking(
     .from(businesses)
     .where(eq(businesses.id, booking.businessId))
     .limit(1);
-  if (!business) return { ok: false, error: "business_not_found" };
+  if (!business || business.status === "SUSPENDED") return { ok: false, error: "business_not_found" };
 
   const start = new Date(newStartAt);
   if (Number.isNaN(start.getTime())) return { ok: false, error: "invalid_input" };

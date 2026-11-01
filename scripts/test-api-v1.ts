@@ -1,6 +1,6 @@
 import { getDb } from "../src/server/db";
-import { businesses, users, staff, services } from "../src/server/db/schema";
-import { eq } from "drizzle-orm";
+import { businesses, users, staff, services, workingHours } from "../src/server/db/schema";
+import { and, eq, gt } from "drizzle-orm";
 import { createAuthTokens, verifyAccessToken, verifyRefreshToken } from "../src/server/api/v1/auth";
 import { getPublicBusiness } from "../src/server/business/public";
 import { getAvailableSlots } from "../src/server/booking/slots";
@@ -13,8 +13,12 @@ async function run() {
   console.log("==========================================");
 
   const db = await getDb();
-  const [b] = await db.select().from(businesses).limit(1);
-  if (!b) throw new Error("No business found");
+  const [b] = await db
+    .select()
+    .from(businesses)
+    .where(and(eq(businesses.status, "ACTIVE"), gt(businesses.trialEndsAt, new Date())))
+    .limit(1);
+  if (!b) throw new Error("No active business found");
 
   const [u] = await db.select().from(users).where(eq(users.id, b.ownerId)).limit(1);
   if (!u) throw new Error("No owner user found");
@@ -80,6 +84,19 @@ async function run() {
 
   if (!activeStaff || !activeService) {
     throw new Error("Need active staff and service to test availability");
+  }
+
+  // Ensure working hours exist for activeStaff
+  const existingWh = await db.select().from(workingHours).where(eq(workingHours.staffId, activeStaff.id)).limit(1);
+  if (existingWh.length === 0) {
+    for (let d = 0; d < 7; d++) {
+      await db.insert(workingHours).values({
+        staffId: activeStaff.id,
+        weekday: d,
+        startMinute: 9 * 60,
+        endMinute: 21 * 60,
+      });
+    }
   }
 
   const tomorrow = addDays(todayInZone(b.timezone), 1);

@@ -118,17 +118,17 @@ export function MyBookingsScreen({ phone, onBack, onReschedule }: MyBookingsScre
                 <Text style={styles.address}>📍 {b.salon.address}</Text>
               ) : null}
 
-              {b.status === "CONFIRMED" || b.status === "PENDING" ? (
+              {(b.status === "CONFIRMED" || b.status === "PENDING") && b.manageToken ? (
                 <View style={styles.actionsRow}>
                   <TouchableOpacity
                     style={styles.rescheduleBtn}
-                    onPress={() => onReschedule(b.manageToken)}
+                    onPress={() => onReschedule(b.manageToken!)}
                   >
                     <Text style={styles.rescheduleText}>Перенести</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.cancelBtn}
-                    onPress={() => handleCancel(b.manageToken)}
+                    onPress={() => handleCancel(b.manageToken!)}
                   >
                     <Text style={styles.cancelText}>Отменить</Text>
                   </TouchableOpacity>
