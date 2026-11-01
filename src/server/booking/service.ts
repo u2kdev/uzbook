@@ -15,6 +15,7 @@ import {
 import { dateInZone } from "./time";
 import { getAvailableSlots } from "./slots";
 import { logger } from "@/server/logger";
+import { recordAuditLog } from "@/server/payments/service";
 
 export type BookingFailure =
   | "business_not_found"
@@ -196,6 +197,23 @@ export async function createBooking(input: {
       staffId: member.id,
       startAt: start.toISOString(),
       source: input.source ?? "WEB",
+    });
+
+    await recordAuditLog({
+      userId: input.business.ownerId,
+      action: "salon.booking_created",
+      entityType: "business",
+      entityId: input.business.id,
+      details: {
+        businessName: input.business.name,
+        bookingId: created.row.id,
+        clientName: input.name.trim().slice(0, 120),
+        clientPhone: phone,
+        serviceName: service.name,
+        staffName: member.name,
+        price: service.price,
+        source: input.source ?? "WEB",
+      },
     });
 
     return {

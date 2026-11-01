@@ -8,7 +8,10 @@ export const metadata: Metadata = { title: "Вход" };
 export default async function LoginPage() {
   // getCurrentUser verifies the user still exists, so a stale cookie can't trap us in onboarding.
   const user = await getCurrentUser();
-  if (user) redirect(user.role === "OWNER" ? "/dashboard" : "/admin");
+  if (user) {
+    if (user.role === "PROVIDER") redirect("/provider");
+    redirect(user.role === "OWNER" ? "/dashboard" : "/admin");
+  }
 
   return <AuthForm mode="login" />;
 }

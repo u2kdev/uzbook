@@ -3,7 +3,7 @@ import { getAdminUsers } from "@/server/business/admin";
 import { UserTable } from "@/components/admin/user-table";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Пользователи" };
+export const metadata = { title: "Пользователи по ролям" };
 
 export default async function AdminUsersPage() {
   const session = await requireAdmin();
@@ -13,28 +13,31 @@ export default async function AdminUsersPage() {
     <div className="space-y-5">
       <div>
         <p className="text-[11px] font-semibold tracking-[0.16em] text-muted uppercase">
-          Аккаунты
+          Раздельные списки по ролям
         </p>
         <h1 className="mt-1.5 text-[26px] leading-tight font-semibold tracking-[-0.03em]">
-          Пользователи
+          Админы · Саппорты · Провайдеры · Клиенты
         </h1>
         <p className="mt-1 text-[12.5px] text-muted">
-          {users.length} аккаунтов · {users.filter((row) => row.businessesCount > 0).length} с
-          бизнесом
+          Всего {users.length} аккаунтов · выберите вкладку ниже для фильтрации по роли.
         </p>
       </div>
 
       <UserTable
         canManage={session.role === "ADMIN"}
-        rows={users.map(({ user, businessesCount, businessNames }) => ({
+        rows={users.map(({ user, businessesCount, businessNames, connectedByProviderCount }) => ({
           id: user.id,
           name: user.name,
           email: user.email,
+          username: user.username ?? null,
           phone: user.phone,
           role: user.role,
+          commissionPercent: user.commissionPercent ?? 60,
+          payoutCard: user.payoutCard ?? null,
           createdAt: user.createdAt.toISOString(),
           businessesCount,
           businessNames,
+          connectedByProviderCount,
           isSelf: user.id === session.id,
         }))}
       />

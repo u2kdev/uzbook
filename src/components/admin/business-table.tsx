@@ -29,6 +29,10 @@ export type AdminBusinessItem = {
   createdAt: string;
   ownerName: string;
   ownerEmail: string;
+  providerName?: string | null;
+  customStaffLimit?: number | null;
+  customClientLimit?: number | null;
+  customPriceUzs?: number | null;
   pendingPlan: PlanId | null;
 };
 
@@ -150,6 +154,9 @@ export function BusinessTable({
                   </div>
                   <p className="mt-0.5 truncate text-[11px] text-muted">
                     {row.ownerName} · {row.ownerEmail}
+                    {row.providerName ? ` · 🤝 Провайдер: ${row.providerName}` : ""}
+                    {row.customStaffLimit ? ` · до ${row.customStaffLimit} сотр.` : ""}
+                    {row.customClientLimit ? ` · до ${row.customClientLimit} кл.` : ""}
                   </p>
                 </div>
 

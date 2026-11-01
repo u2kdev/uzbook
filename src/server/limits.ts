@@ -108,9 +108,10 @@ export async function staffLimitError(business: Business): Promise<string | null
   if (blocked) return blocked;
 
   const plan = planById(business.plan);
+  const effectiveStaffLimit = business.customStaffLimit ?? plan.staffLimit;
   const usage = await getUsage(business);
-  if (usage.staff >= plan.staffLimit) {
-    return `На тарифе «${plan.name}» доступно мастеров: ${plan.staffLimit}. Лимит исчерпан — смените тариф в разделе «Оплата».`;
+  if (usage.staff >= effectiveStaffLimit) {
+    return `На вашем тарифе доступно мастеров: ${effectiveStaffLimit}. Лимит исчерпан — смените тариф в разделе «Оплата».`;
   }
   return null;
 }

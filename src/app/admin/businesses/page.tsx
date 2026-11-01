@@ -39,7 +39,7 @@ export default async function AdminBusinessesPage({
       <BusinessTable
         canManage={session.role === "ADMIN"}
         initialQuery={params.q ?? ""}
-        rows={rows.map(({ business, ownerName, ownerEmail, pending }) => ({
+        rows={rows.map(({ business, ownerName, ownerEmail, providerName, pending }) => ({
           id: business.id,
           name: business.name,
           slug: business.slug,
@@ -49,6 +49,10 @@ export default async function AdminBusinessesPage({
           createdAt: business.createdAt.toISOString(),
           ownerName,
           ownerEmail,
+          providerName,
+          customStaffLimit: business.customStaffLimit ?? null,
+          customClientLimit: business.customClientLimit ?? null,
+          customPriceUzs: business.customPriceUzs ?? null,
           pendingPlan: pending?.plan ?? null,
         }))}
       />

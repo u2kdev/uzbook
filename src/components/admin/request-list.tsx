@@ -22,6 +22,10 @@ export type RequestRow = {
   amount: number;
   currency: string;
   createdAt: string;
+  providerName?: string | null;
+  providerPayoutCard?: string | null;
+  providerCommissionPercent?: number | null;
+  providerPayoutAmount?: number | null;
 };
 
 export function RequestList({
@@ -88,6 +92,22 @@ export function RequestList({
               <p className="mt-1 break-all font-mono text-[10.5px] text-ink-soft">
                 {request.note}
               </p>
+            )}
+            {request.providerName && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg bg-mint/10 px-2.5 py-1 text-[11px] font-medium text-mint">
+                <span>
+                  🤝 Провайдер: <b>{request.providerName}</b>
+                </span>
+                {request.providerPayoutAmount ? (
+                  <span>
+                    · Выплата на карту ({request.providerCommissionPercent ?? 60}%):{" "}
+                    <b>{formatMoney(request.providerPayoutAmount, request.currency)}</b>
+                  </span>
+                ) : null}
+                {request.providerPayoutCard ? (
+                  <span className="font-mono text-ink">💳 {request.providerPayoutCard}</span>
+                ) : null}
+              </div>
             )}
           </div>
 

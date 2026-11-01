@@ -6,6 +6,7 @@ import { getDb } from "@/server/db";
 import { bookings, businesses, services, staff, staffServices } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { createBooking } from "@/server/booking/service";
+import { recordAuditLog } from "@/server/payments/service";
 
 export type StatusActionResult = { ok: boolean; error?: string };
 
@@ -19,7 +20,7 @@ export async function setBookingStatus(
 
   const db = await getDb();
   const [business] = await db
-    .select({ id: businesses.id })
+    .select({ id: businesses.id, name: businesses.name })
     .from(businesses)
     .where(eq(businesses.ownerId, session.id))
     .limit(1);
@@ -36,9 +37,22 @@ export async function setBookingStatus(
       ...(status === "CANCELLED" ? { cancelledAt: new Date(), cancelReason } : {}),
     })
     .where(and(eq(bookings.id, bookingId), eq(bookings.businessId, business.id)))
-    .returning({ id: bookings.id });
+    .returning({ id: bookings.id, clientName: bookings.clientName });
 
   if (updated.length === 0) return { ok: false, error: "Запись не найдена или нет доступа" };
+
+  await recordAuditLog({
+    userId: session.id,
+    action: `salon.booking_${status.toLowerCase()}`,
+    entityType: "business",
+    entityId: business.id,
+    details: {
+      businessName: business.name,
+      bookingId,
+      clientName: updated[0]?.clientName,
+      status,
+    },
+  });
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/bookings");
@@ -102,6 +116,20 @@ export async function createManualBookingAction(
   if (!result.ok) {
     return { error: FAILURE_TEXT[result.error] ?? "Не удалось создать запись" };
   }
+
+  await recordAuditLog({
+    userId: session.id,
+    action: "salon.manual_booking_created",
+    entityType: "business",
+    entityId: business.id,
+    details: {
+      businessName: business.name,
+      bookingId: result.data.id,
+      clientName: name,
+      clientPhone: phone,
+      startAt,
+    },
+  });
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/bookings");

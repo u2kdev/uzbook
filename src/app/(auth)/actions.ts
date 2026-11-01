@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/server/db";
 import { businesses, subscriptions, users } from "@/server/db/schema";
@@ -18,6 +18,7 @@ import { rateLimit } from "@/server/http/rate-limit";
 import { TRIAL_MS } from "@/lib/plans";
 import { isValidSlug, slugify } from "@/lib/slug";
 import { logger } from "@/server/logger";
+import { recordAuditLog } from "@/server/payments/service";
 
 export type AuthState = { error?: string } | null;
 
@@ -41,7 +42,7 @@ async function actionClientIp(): Promise<string> {
 }
 
 const loginCredentials = z.object({
-  email: z.string().regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "Введите корректный email"),
+  login: z.string().min(2, "Введите email или никнейм").max(120),
   password: z.string().min(6, "Пароль минимум 6 символов").max(128),
 });
 
@@ -86,6 +87,13 @@ export async function registerAction(_prev: AuthState, formData: FormData): Prom
     .returning();
 
   logger.info("auth.register", { userId: user.id, role: user.role });
+  await recordAuditLog({
+    userId: user.id,
+    action: "auth.register",
+    entityType: "user",
+    entityId: user.id,
+    details: { email: user.email, name: user.name, role: user.role },
+  });
 
   await setSessionCookie(user);
   redirect("/onboarding");
@@ -99,12 +107,12 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
   }
 
   const parsed = loginCredentials.safeParse({
-    email: String(formData.get("email") ?? "").trim().toLowerCase(),
+    login: String(formData.get("email") ?? "").trim().toLowerCase(),
     password: String(formData.get("password") ?? ""),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const emailLimit = rateLimit(`web_login_email:${parsed.data.email}`, 8, 60_000);
+  const emailLimit = rateLimit(`web_login_email:${parsed.data.login}`, 8, 60_000);
   if (!emailLimit.ok) {
     return { error: "Слишком много попыток входа для этого аккаунта. Подождите минуту." };
   }
@@ -113,23 +121,31 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
   const [user] = await db
     .select()
     .from(users)
-    .where(eq(users.email, parsed.data.email))
+    .where(or(eq(users.email, parsed.data.login), eq(users.username, parsed.data.login)))
     .limit(1);
   if (!user) {
     await verifyPassword(parsed.data.password, DUMMY_PASSWORD_HASH);
     logger.warn("auth.login_failed", { reason: "user_not_found", ip });
-    return { error: "Неверный email или пароль." };
+    return { error: "Неверный логин (email/никнейм) или пароль." };
   }
 
   const valid = await verifyPassword(parsed.data.password, user.passwordHash);
   if (!valid) {
     logger.warn("auth.login_failed", { userId: user.id, reason: "invalid_password", ip });
-    return { error: "Неверный email или пароль." };
+    return { error: "Неверный логин (email/никнейм) или пароль." };
   }
 
   logger.info("auth.login_success", { userId: user.id, role: user.role });
+  await recordAuditLog({
+    userId: user.id,
+    action: "auth.login",
+    entityType: "user",
+    entityId: user.id,
+    details: { role: user.role, login: parsed.data.login },
+  });
 
   await setSessionCookie(user);
+  if (user.role === "PROVIDER") redirect("/provider");
   redirect(user.role === "OWNER" ? "/dashboard" : "/admin");
 }
 
@@ -214,6 +230,14 @@ export async function createBusinessAction(
       provider: "MANUAL",
       currentPeriodEnd: trialEndsAt,
       note: "Автоматически выданный пробный период",
+    });
+
+    await recordAuditLog({
+      userId: session.id,
+      action: "business.created",
+      entityType: "business",
+      entityId: business.id,
+      details: { name: business.name, slug: business.slug, category: business.category },
     });
   });
 

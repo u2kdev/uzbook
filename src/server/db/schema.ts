@@ -18,7 +18,7 @@ import {
 /* Enums                                                               */
 /* ------------------------------------------------------------------ */
 
-export const userRoleEnum = pgEnum("user_role", ["OWNER", "SUPPORT", "ADMIN"]);
+export const userRoleEnum = pgEnum("user_role", ["OWNER", "SUPPORT", "ADMIN", "PROVIDER"]);
 export const businessStatusEnum = pgEnum("business_status", ["DRAFT", "ACTIVE", "SUSPENDED"]);
 export const planEnum = pgEnum("plan", ["TRIAL", "START", "PRO", "BUSINESS"]);
 export const bookingStatusEnum = pgEnum("booking_status", [
@@ -128,13 +128,19 @@ export const users = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     email: text("email").notNull(),
+    username: text("username"),
     passwordHash: text("password_hash").notNull(),
     name: text("name").notNull(),
     phone: text("phone"),
     role: userRoleEnum("role").notNull().default("OWNER"),
+    commissionPercent: integer("commission_percent").notNull().default(60),
+    payoutCard: text("payout_card"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("users_email_uq").on(t.email)],
+  (t) => [
+    uniqueIndex("users_email_uq").on(t.email),
+    uniqueIndex("users_username_uq").on(t.username),
+  ],
 );
 
 export const businesses = pgTable(
@@ -144,6 +150,7 @@ export const businesses = pgTable(
     ownerId: uuid("owner_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    providerId: uuid("provider_id").references(() => users.id, { onDelete: "set null" }),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
     category: text("category").notNull().default("beauty"),
@@ -161,6 +168,9 @@ export const businesses = pgTable(
     status: businessStatusEnum("status").notNull().default("ACTIVE"),
     plan: planEnum("plan").notNull().default("TRIAL"),
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+    customStaffLimit: integer("custom_staff_limit"),
+    customClientLimit: integer("custom_client_limit"),
+    customPriceUzs: integer("custom_price_uzs"),
     settings: jsonb("settings").$type<BusinessSettings>().notNull().default(DEFAULT_SETTINGS),
     theme: jsonb("theme")
       .$type<BusinessTheme>()
@@ -171,6 +181,7 @@ export const businesses = pgTable(
   (t) => [
     uniqueIndex("businesses_slug_uq").on(t.slug),
     index("businesses_owner_idx").on(t.ownerId),
+    index("businesses_provider_idx").on(t.providerId),
   ],
 );
 
@@ -323,11 +334,16 @@ export const subscriptions = pgTable(
     businessId: uuid("business_id")
       .notNull()
       .references(() => businesses.id, { onDelete: "cascade" }),
+    providerId: uuid("provider_id").references(() => users.id, { onDelete: "set null" }),
     plan: planEnum("plan").notNull(),
     status: subscriptionStatusEnum("status").notNull().default("TRIAL"),
     provider: paymentProviderEnum("provider").notNull().default("MANUAL"),
     amount: integer("amount").notNull().default(0),
     currency: text("currency").notNull().default("UZS"),
+    customStaffLimit: integer("custom_staff_limit"),
+    customClientLimit: integer("custom_client_limit"),
+    providerCommissionPercent: integer("provider_commission_percent"),
+    providerPayoutAmount: integer("provider_payout_amount"),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     note: text("note"),
@@ -396,6 +412,38 @@ export const auditLogs = pgTable(
   ],
 );
 
+export const providerApplications = pgTable(
+  "provider_applications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fullName: text("full_name").notNull(),
+    phone: text("phone").notNull(),
+    email: text("email"),
+    telegram: text("telegram"),
+    city: text("city"),
+    payoutCard: text("payout_card"),
+    experienceNote: text("experience_note"),
+    status: text("status").notNull().default("PENDING"), // 'PENDING' | 'APPROVED' | 'DECLINED'
+    approvedUserId: uuid("approved_user_id").references(() => users.id, { onDelete: "set null" }),
+    reviewedByUserId: uuid("reviewed_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("provider_applications_status_idx").on(t.status)],
+);
+
+export const trustedLogos = pgTable("trusted_logos", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  imageUrl: text("image_url").notNull(),
+  linkUrl: text("link_url"),
+  enabled: boolean("enabled").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* ------------------------------------------------------------------ */
 /* Relations                                                           */
 /* ------------------------------------------------------------------ */
@@ -461,4 +509,7 @@ export type Payment = typeof payments.$inferSelect;
 export type PageSection = typeof pageSections.$inferSelect;
 export type GalleryImage = typeof galleryImages.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type ProviderApplication = typeof providerApplications.$inferSelect;
+export type TrustedLogo = typeof trustedLogos.$inferSelect;
+
 

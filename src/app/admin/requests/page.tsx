@@ -64,6 +64,10 @@ export default async function AdminRequestsPage() {
             amount: row.subscription.amount,
             currency: row.subscription.currency,
             createdAt: row.subscription.createdAt.toISOString(),
+            providerName: row.providerName,
+            providerPayoutCard: row.providerPayoutCard,
+            providerCommissionPercent: row.subscription.providerCommissionPercent,
+            providerPayoutAmount: row.subscription.providerPayoutAmount,
           }))}
         />
       </section>

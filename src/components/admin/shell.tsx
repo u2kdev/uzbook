@@ -5,10 +5,13 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   Building2,
+  Handshake,
+  Images,
   Inbox,
   LayoutGrid,
   LogOut,
   Menu,
+  ScrollText,
   ShieldCheck,
   Users,
   X,
@@ -18,19 +21,24 @@ import { logoutAction } from "@/app/(auth)/actions";
 
 const NAV = [
   { href: "/admin", label: "Дашборд", icon: LayoutGrid },
-  { href: "/admin/businesses", label: "Бизнесы", icon: Building2 },
-  { href: "/admin/requests", label: "Заявки", icon: Inbox },
+  { href: "/admin/providers", label: "Провайдеры", icon: Handshake },
   { href: "/admin/users", label: "Пользователи", icon: Users },
+  { href: "/admin/logs", label: "Логи всего", icon: ScrollText },
+  { href: "/admin/businesses", label: "Бизнесы", icon: Building2 },
+  { href: "/admin/requests", label: "Заявки на тариф", icon: Inbox },
+  { href: "/admin/logos", label: "Карусель (PNG)", icon: Images },
 ];
 
 export function AdminShell({
   children,
   user,
   pendingCount,
+  pendingProviderCount = 0,
 }: {
   children: React.ReactNode;
   user: { name: string; email: string; role: "ADMIN" | "SUPPORT" };
   pendingCount: number;
+  pendingProviderCount?: number;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -41,7 +49,7 @@ export function AdminShell({
       <div className="flex items-center justify-between px-1 pt-1">
         <Logo />
         <span className="rounded-full bg-ink px-2 py-1 text-[9px] font-semibold tracking-[0.12em] text-white uppercase">
-          {isAdmin ? "Admin" : "Support"}
+          {isAdmin ? "Owner / Admin" : "Support"}
         </span>
       </div>
 
@@ -49,6 +57,13 @@ export function AdminShell({
         {NAV.map((item) => {
           const active =
             item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
+          const badgeValue =
+            item.href === "/admin/requests"
+              ? pendingCount
+              : item.href === "/admin/providers"
+              ? pendingProviderCount
+              : 0;
+
           return (
             <Link
               key={item.href}
@@ -62,13 +77,13 @@ export function AdminShell({
             >
               <item.icon size={16} strokeWidth={1.6} />
               {item.label}
-              {item.href === "/admin/requests" && pendingCount > 0 && (
+              {badgeValue > 0 && (
                 <span
                   className={`ml-auto grid min-w-5 place-items-center rounded-full px-1.5 py-0.5 text-[9.5px] font-semibold ${
-                    active ? "bg-white/15 text-white" : "bg-amber/10 text-amber"
+                    active ? "bg-white/15 text-white" : "bg-amber/15 text-amber"
                   }`}
                 >
-                  {pendingCount}
+                  {badgeValue}
                 </span>
               )}
             </Link>
@@ -79,11 +94,11 @@ export function AdminShell({
       <div className="rounded-2xl bg-paper p-3.5">
         <p className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-soft">
           <ShieldCheck size={13} strokeWidth={1.7} className="text-mint" />
-          {isAdmin ? "Полный доступ" : "Режим поддержки"}
+          {isAdmin ? "Главный владелец" : "Режим поддержки"}
         </p>
         <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
           {isAdmin
-            ? "Тарифы, блокировки и роли пользователей."
+            ? "Управление провайдерами, ролями, тарифами, каруселью и логами всей платформы."
             : "Просмотр бизнесов и заявок без изменения тарифов."}
         </p>
       </div>
@@ -93,7 +108,9 @@ export function AdminShell({
           {(user.name || user.email || "A").slice(0, 1).toUpperCase()}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[12.5px] font-medium">{user.name || (isAdmin ? "Админ" : "Поддержка")}</p>
+          <p className="truncate text-[12.5px] font-medium">
+            {user.name || (isAdmin ? "Админ" : "Поддержка")}
+          </p>
           <p className="truncate text-[10.5px] text-muted">{user.email}</p>
         </div>
         <form action={logoutAction}>
@@ -112,7 +129,7 @@ export function AdminShell({
   return (
     <div className="flex min-h-dvh bg-paper">
       {/* Desktop / Tablet Sidebar */}
-      <aside className="sticky top-0 z-30 hidden h-dvh w-[240px] shrink-0 flex-col border-r border-line bg-white sm:flex">
+      <aside className="sticky top-0 z-30 hidden h-dvh w-[248px] shrink-0 flex-col border-r border-line bg-white sm:flex">
         {sidebar}
       </aside>
 
@@ -132,7 +149,7 @@ export function AdminShell({
             aria-label="Боковое меню"
           >
             <Menu size={16} strokeWidth={1.6} />
-            <span>Боковое меню</span>
+            <span>Меню</span>
           </button>
         </div>
 
@@ -169,27 +186,27 @@ export function AdminShell({
             <span>Дашборд</span>
           </Link>
           <Link
-            href="/admin/businesses"
-            className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
-              pathname.startsWith("/admin/businesses") ? "text-brand" : "text-muted hover:text-ink"
-            }`}
-          >
-            <Building2 size={18} strokeWidth={pathname.startsWith("/admin/businesses") ? 2 : 1.6} />
-            <span>Бизнесы</span>
-          </Link>
-          <Link
-            href="/admin/requests"
+            href="/admin/providers"
             className={`relative flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
-              pathname.startsWith("/admin/requests") ? "text-brand" : "text-muted hover:text-ink"
+              pathname.startsWith("/admin/providers") ? "text-brand" : "text-muted hover:text-ink"
             }`}
           >
-            <Inbox size={18} strokeWidth={pathname.startsWith("/admin/requests") ? 2 : 1.6} />
-            <span>Заявки</span>
-            {pendingCount > 0 && (
-              <span className="absolute top-1 right-2 grid size-4 place-items-center rounded-full bg-amber text-[9px] font-bold text-white">
-                {pendingCount}
+            <Handshake size={18} strokeWidth={pathname.startsWith("/admin/providers") ? 2 : 1.6} />
+            <span>Провайдеры</span>
+            {pendingProviderCount > 0 && (
+              <span className="absolute top-1 right-1 grid size-4 place-items-center rounded-full bg-amber text-[9px] font-bold text-white">
+                {pendingProviderCount}
               </span>
             )}
+          </Link>
+          <Link
+            href="/admin/logs"
+            className={`flex flex-col items-center gap-1 py-1 text-[10px] font-medium transition-colors ${
+              pathname.startsWith("/admin/logs") ? "text-brand" : "text-muted hover:text-ink"
+            }`}
+          >
+            <ScrollText size={18} strokeWidth={pathname.startsWith("/admin/logs") ? 2 : 1.6} />
+            <span>Логи</span>
           </Link>
           <Link
             href="/admin/users"
@@ -207,7 +224,7 @@ export function AdminShell({
             }`}
           >
             <Menu size={18} strokeWidth={1.6} />
-            <span>Боковое меню</span>
+            <span>Ещё</span>
           </button>
         </nav>
 

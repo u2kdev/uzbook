@@ -9,7 +9,7 @@ export type SessionUser = {
   id: string;
   email: string;
   name: string;
-  role: "OWNER" | "SUPPORT" | "ADMIN";
+  role: "OWNER" | "SUPPORT" | "ADMIN" | "PROVIDER";
   ver?: string;
 };
 

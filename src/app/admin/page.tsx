@@ -127,6 +127,11 @@ export default async function AdminOverviewPage() {
               amount: row.subscription.amount,
               currency: row.subscription.currency,
               createdAt: row.subscription.createdAt.toISOString(),
+              note: row.subscription.note,
+              providerName: row.providerName,
+              providerPayoutCard: row.providerPayoutCard,
+              providerCommissionPercent: row.subscription.providerCommissionPercent,
+              providerPayoutAmount: row.subscription.providerPayoutAmount,
             }))}
           />
         </section>

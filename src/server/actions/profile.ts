@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/server/db";
-import { businesses, subscriptions, type BusinessSettings } from "@/server/db/schema";
+import { businesses, subscriptions, users, type BusinessSettings } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { isValidSlug, slugify } from "@/lib/slug";
 import { planById, type PlanId } from "@/lib/plans";
+import { recordAuditLog } from "@/server/payments/service";
 
 export type ProfileState = {
   ok?: boolean;
@@ -140,6 +141,14 @@ export async function updateProfileAction(
     })
     .where(eq(businesses.id, business.id));
 
+  await recordAuditLog({
+    userId: business.ownerId,
+    action: "salon.profile_updated",
+    entityType: "business",
+    entityId: business.id,
+    details: { businessName: parsed.data.name, slug: parsed.data.slug },
+  });
+
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
   revalidatePath("/dashboard/billing");
@@ -167,6 +176,19 @@ export async function requestPlanAction(
   }
 
   const current = planById(plan);
+  const amount = business.customPriceUzs ?? current.priceUzs;
+
+  let providerCommissionPercent: number | null = null;
+  let providerPayoutAmount: number | null = null;
+  if (business.providerId) {
+    const [prov] = await db
+      .select({ commissionPercent: users.commissionPercent })
+      .from(users)
+      .where(eq(users.id, business.providerId))
+      .limit(1);
+    providerCommissionPercent = prov?.commissionPercent ?? 60;
+    providerPayoutAmount = Math.round((amount * providerCommissionPercent) / 100);
+  }
 
   await db.transaction(async (tx) => {
     await tx
@@ -178,14 +200,33 @@ export async function requestPlanAction(
 
     await tx.insert(subscriptions).values({
       businessId: business.id,
+      providerId: business.providerId ?? null,
       plan,
       status: "PENDING",
       provider: "MANUAL",
-      amount: current.priceUzs,
+      amount,
       currency: business.currency,
+      customStaffLimit: business.customStaffLimit ?? null,
+      customClientLimit: business.customClientLimit ?? null,
+      providerCommissionPercent,
+      providerPayoutAmount,
       note: "Заявка на подключение тарифа из кабинета",
       currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
+  });
+
+  await recordAuditLog({
+    userId: business.ownerId,
+    action: "salon.subscription_requested",
+    entityType: "business",
+    entityId: business.id,
+    details: {
+      businessName: business.name,
+      plan,
+      amount,
+      providerId: business.providerId,
+      providerPayoutAmount,
+    },
   });
 
   revalidatePath("/dashboard/billing");

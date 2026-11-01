@@ -39,14 +39,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
         <div>
           <label htmlFor="email" className="label-base">
-            Email
+            {mode === "login" ? "Email или никнейм (для провайдеров)" : "Email"}
           </label>
           <input
             id="email"
             name="email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@salon.uz"
+            type={mode === "login" ? "text" : "email"}
+            autoComplete={mode === "login" ? "username" : "email"}
+            placeholder={mode === "login" ? "you@salon.uz или ваш никнейм" : "you@salon.uz"}
             className="input-base"
             required
           />

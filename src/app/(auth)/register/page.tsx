@@ -7,6 +7,9 @@ export const metadata: Metadata = { title: "Регистрация" };
 
 export default async function RegisterPage() {
   const user = await getCurrentUser();
-  if (user) redirect(user.role === "OWNER" ? "/dashboard" : "/admin");
+  if (user) {
+    if (user.role === "PROVIDER") redirect("/provider");
+    redirect(user.role === "OWNER" ? "/dashboard" : "/admin");
+  }
   return <AuthForm mode="register" />;
 }

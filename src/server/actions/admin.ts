@@ -230,11 +230,14 @@ export async function approveSubscriptionAction(subscriptionId: string): Promise
         ),
       );
 
+    const effectiveAmount =
+      subscription.amount && subscription.amount > 0 ? subscription.amount : plan.priceUzs;
+
     await tx
       .update(subscriptions)
       .set({
         status: "ACTIVE",
-        amount: plan.priceUzs,
+        amount: effectiveAmount,
         startedAt: now,
         currentPeriodEnd: periodEnd,
         note: subscription.note ? `${subscription.note} (подтверждено)` : "Подтверждено администратором",
@@ -333,11 +336,11 @@ export async function declineSubscriptionAction(subscriptionId: string): Promise
 
 export async function setUserRoleAction(
   userId: string,
-  role: "OWNER" | "SUPPORT" | "ADMIN",
+  role: "OWNER" | "SUPPORT" | "ADMIN" | "PROVIDER",
 ): Promise<AdminState> {
   const session = await requireAdminRole();
   if (userId === session.id) return { error: "Нельзя изменить собственную роль" };
-  if (!["OWNER", "SUPPORT", "ADMIN"].includes(role)) return { error: "Неизвестная роль" };
+  if (!["OWNER", "SUPPORT", "ADMIN", "PROVIDER"].includes(role)) return { error: "Неизвестная роль" };
 
   const db = await getDb();
   const [targetUser] = await db

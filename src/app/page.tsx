@@ -14,7 +14,11 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Reveal } from "@/components/reveal";
+import { TrustedLogosCarousel } from "@/components/trusted-logos-carousel";
+import { getTrustedLogos } from "@/server/actions/logos";
 import { PLANS, formatMoney } from "@/lib/plans";
+
+export const dynamic = "force-dynamic";
 
 const CATEGORIES = [
   "Барбершопы",
@@ -48,7 +52,9 @@ const FEATURES = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const trustedLogos = await getTrustedLogos(true);
+
   return (
     <div className="min-h-dvh overflow-x-clip bg-paper">
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(80%_50%_at_50%_-10%,rgba(110,86,248,0.14),transparent_60%),radial-gradient(50%_40%_at_100%_20%,rgba(18,184,134,0.08),transparent_60%)]" />
@@ -66,6 +72,9 @@ export default function HomePage() {
             <a href="#pricing" className="transition-colors hover:text-ink">
               Тарифы
             </a>
+            <Link href="/become-provider" className="font-semibold text-brand transition-colors hover:text-brand-dark">
+              Стать провайдером
+            </Link>
           </nav>
           <div className="flex items-center gap-2">
             <Link
@@ -238,6 +247,9 @@ export default function HomePage() {
             ))}
           </div>
         </section>
+
+        {/* Trusted By PNG Logos Rotating Carousel */}
+        <TrustedLogosCarousel logos={trustedLogos} />
 
         {/* ---------------------------------------------------------------- */}
         <section id="features" className="container-page py-24 sm:py-32">
@@ -501,6 +513,9 @@ export default function HomePage() {
             <span className="text-[12px] text-muted">© {new Date().getFullYear()} uzbook.online</span>
           </div>
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12.5px] text-muted">
+            <Link href="/become-provider" className="font-semibold text-brand hover:underline">
+              Стать провайдером (партнёрская программа)
+            </Link>
             <Link href="/login" className="hover:text-ink">
               Вход
             </Link>

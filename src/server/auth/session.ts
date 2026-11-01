@@ -74,6 +74,12 @@ export async function requireAdmin(): Promise<SessionUser> {
   return session;
 }
 
+export async function requireProvider(): Promise<SessionUser> {
+  const session = await requireUser();
+  if (session.role !== "PROVIDER" && session.role !== "ADMIN") redirect("/dashboard");
+  return session;
+}
+
 export async function getCurrentUser(): Promise<User | null> {
   const session = await getSession();
   if (!session) return null;

@@ -7,6 +7,7 @@ import { getDb } from "@/server/db";
 import { businesses, scheduleExceptions, services, staff, staffServices, workingHours } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { serviceLimitError, staffLimitError, writeBlockedReason } from "@/server/limits";
+import { recordAuditLog } from "@/server/payments/service";
 
 export type ActionState = { ok?: boolean; error?: string; field?: string } | null;
 
@@ -67,10 +68,26 @@ export async function createServiceAction(
     .from(services)
     .where(eq(services.businessId, business.id));
 
-  await db.insert(services).values({
-    businessId: business.id,
-    ...parsed.data,
-    sortOrder: existing.length,
+  const [created] = await db
+    .insert(services)
+    .values({
+      businessId: business.id,
+      ...parsed.data,
+      sortOrder: existing.length,
+    })
+    .returning({ id: services.id });
+
+  await recordAuditLog({
+    userId: business.ownerId,
+    action: "salon.service_created",
+    entityType: "business",
+    entityId: business.id,
+    details: {
+      businessName: business.name,
+      serviceId: created?.id,
+      serviceName: parsed.data.name,
+      price: parsed.data.price,
+    },
   });
 
   revalidatePath("/dashboard/services");
@@ -179,6 +196,19 @@ export async function createStaffAction(
       endMinute: 20 * 60,
     })),
   );
+
+  await recordAuditLog({
+    userId: business.ownerId,
+    action: "salon.staff_created",
+    entityType: "business",
+    entityId: business.id,
+    details: {
+      businessName: business.name,
+      staffId: member.id,
+      staffName: member.name,
+      title: member.title,
+    },
+  });
 
   revalidatePath("/dashboard/staff");
   revalidatePath(`/${business.slug}`);
