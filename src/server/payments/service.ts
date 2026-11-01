@@ -512,10 +512,10 @@ export async function refundPayment(params: {
         and(eq(subscriptions.businessId, payment.businessId), eq(subscriptions.status, "ACTIVE")),
       );
 
-    // Rollback business plan to TRIAL
+    // Rollback business plan to TRIAL and set trialEndsAt to now so trial is expired until renewed
     await tx
       .update(businesses)
-      .set({ plan: "TRIAL" })
+      .set({ plan: "TRIAL", trialEndsAt: now })
       .where(eq(businesses.id, payment.businessId));
 
     await tx.insert(auditLogs).values({

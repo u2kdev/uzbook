@@ -272,8 +272,36 @@ export async function getAdminProviders(): Promise<ProviderSummaryRow[]> {
     .where(eq(users.role, "PROVIDER"))
     .orderBy(desc(users.createdAt));
 
-  const allBiz = await db.select().from(businesses).orderBy(desc(businesses.createdAt));
-  const allSubs = await db.select().from(subscriptions).orderBy(desc(subscriptions.createdAt));
+  if (providerUsers.length === 0) return [];
+
+  const providerIds = providerUsers.map((p) => p.id);
+  const allBiz = await db
+    .select()
+    .from(businesses)
+    .where(inArray(businesses.providerId, providerIds))
+    .orderBy(desc(businesses.createdAt));
+
+  const bizIds = allBiz.map((b) => b.id);
+  const allSubs =
+    bizIds.length > 0
+      ? await db
+          .select()
+          .from(subscriptions)
+          .where(
+            sql`${subscriptions.providerId} in (${sql.join(
+              providerIds.map((id) => sql`${id}`),
+              sql`, `,
+            )}) or ${subscriptions.businessId} in (${sql.join(
+              bizIds.map((id) => sql`${id}`),
+              sql`, `,
+            )})`,
+          )
+          .orderBy(desc(subscriptions.createdAt))
+      : await db
+          .select()
+          .from(subscriptions)
+          .where(inArray(subscriptions.providerId, providerIds))
+          .orderBy(desc(subscriptions.createdAt));
 
   return providerUsers.map((prov) => {
     const connected = allBiz.filter((b) => b.providerId === prov.id);
@@ -348,19 +376,41 @@ export async function getProviderDashboardData(providerId: string) {
     .where(eq(businesses.providerId, providerId))
     .orderBy(desc(businesses.createdAt));
 
-  const staffCounts = await db
-    .select({ businessId: staff.businessId, value: count() })
-    .from(staff)
-    .groupBy(staff.businessId);
+  const bizIds = connectedBiz.map((row) => row.business.id);
+  if (bizIds.length === 0) {
+    const commissionPercent = provider.commissionPercent ?? 60;
+    return {
+      provider,
+      clients: [],
+      stats: {
+        connectedCount: 0,
+        commissionPercent,
+        totalGrossPaid: 0,
+        totalEarnedCard: 0,
+        expectedFromPending: 0,
+      },
+    };
+  }
+
+  const [staffCounts, clientCounts, allSubs] = await Promise.all([
+    db
+      .select({ businessId: staff.businessId, value: count() })
+      .from(staff)
+      .where(inArray(staff.businessId, bizIds))
+      .groupBy(staff.businessId),
+    db
+      .select({ businessId: clients.businessId, value: count() })
+      .from(clients)
+      .where(inArray(clients.businessId, bizIds))
+      .groupBy(clients.businessId),
+    db
+      .select()
+      .from(subscriptions)
+      .where(inArray(subscriptions.businessId, bizIds))
+      .orderBy(desc(subscriptions.createdAt)),
+  ]);
   const staffMap = new Map(staffCounts.map((r) => [r.businessId, Number(r.value)]));
-
-  const clientCounts = await db
-    .select({ businessId: clients.businessId, value: count() })
-    .from(clients)
-    .groupBy(clients.businessId);
   const clientMap = new Map(clientCounts.map((r) => [r.businessId, Number(r.value)]));
-
-  const allSubs = await db.select().from(subscriptions).orderBy(desc(subscriptions.createdAt));
 
   const rows: ProviderClientRow[] = connectedBiz.map((row) => {
     const bizSubs = allSubs.filter((s) => s.businessId === row.business.id);

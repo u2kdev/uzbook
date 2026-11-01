@@ -10,8 +10,8 @@ import {
   type Business,
   type Service,
 } from "@/server/db/schema";
-import { addDays, todayInZone } from "@/server/booking/time";
-import { getPreviewSlots, type TimeSlot } from "@/server/booking/slots";
+import { todayInZone } from "@/server/booking/time";
+import { getBatchPreviewSlotsForStaff, type TimeSlot } from "@/server/booking/slots";
 
 export type PublicPageSection = {
   id: string;
@@ -103,39 +103,32 @@ export async function getPublicBusiness(slug: string): Promise<PublicBusiness | 
   }
 
   const today = todayInZone(business.timezone);
+  const staffWithServicesIds = staffRows
+    .filter((member) => (linksByStaff.get(member.id)?.length ?? 0) > 0)
+    .map((member) => member.id);
 
-  const publicStaff: PublicStaff[] = await Promise.all(
-    staffRows.map(async (member) => {
-      const serviceIds = linksByStaff.get(member.id) ?? [];
-      let next: { date: string; slots: TimeSlot[] } | null = null;
-      if (serviceIds.length > 0) {
-        for (let offset = 0; offset < 14; offset++) {
-          const date = addDays(today, offset);
-          const slots = await getPreviewSlots(
-            member.id,
-            date,
-            business.timezone,
-            business.settings,
-            5,
-          );
-          if (slots.length > 0) {
-            next = { date, slots };
-            break;
-          }
-        }
-      }
-      return {
-        id: member.id,
-        name: member.name,
-        title: member.title,
-        bio: member.bio,
-        photoUrl: member.photoUrl,
-        color: member.color,
-        serviceIds,
-        nextSlots: next,
-      };
-    }),
-  );
+  const previewMap = await getBatchPreviewSlotsForStaff({
+    staffIds: staffWithServicesIds,
+    startDate: today,
+    daysAhead: 14,
+    timezone: business.timezone,
+    settings: business.settings,
+    limitPerStaff: 5,
+  });
+
+  const publicStaff: PublicStaff[] = staffRows.map((member) => {
+    const serviceIds = linksByStaff.get(member.id) ?? [];
+    return {
+      id: member.id,
+      name: member.name,
+      title: member.title,
+      bio: member.bio,
+      photoUrl: member.photoUrl,
+      color: member.color,
+      serviceIds,
+      nextSlots: previewMap.get(member.id) ?? null,
+    };
+  });
 
   const catMap = new Map<string, number>();
   for (const service of serviceRows) {

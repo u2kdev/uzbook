@@ -9,8 +9,16 @@ type Bucket = {
   resetAt: number;
 };
 
-const buckets = new Map<string, Bucket>();
-let lastSweep = 0;
+const MAX_BUCKETS = 10_000;
+
+const globalForRateLimit = globalThis as unknown as {
+  __uzbookRateLimitBuckets?: Map<string, Bucket>;
+  __uzbookRateLimitLastSweep?: number;
+};
+
+const buckets =
+  globalForRateLimit.__uzbookRateLimitBuckets ??
+  (globalForRateLimit.__uzbookRateLimitBuckets = new Map<string, Bucket>());
 
 export type RateLimitResult = {
   ok: boolean;
@@ -24,13 +32,18 @@ export function rateLimit(
   windowMs: number,
   now = Date.now(),
 ): RateLimitResult {
+  const lastSweep = globalForRateLimit.__uzbookRateLimitLastSweep ?? 0;
   // Drop expired buckets occasionally so a long-running process does not grow
   // its map forever.
-  if (now - lastSweep > 60_000) {
+  if (now - lastSweep > 60_000 || buckets.size > MAX_BUCKETS) {
     for (const [bucketKey, bucket] of buckets) {
       if (bucket.resetAt <= now) buckets.delete(bucketKey);
     }
-    lastSweep = now;
+    if (buckets.size > MAX_BUCKETS) {
+      const oldestKey = buckets.keys().next().value;
+      if (oldestKey) buckets.delete(oldestKey);
+    }
+    globalForRateLimit.__uzbookRateLimitLastSweep = now;
   }
 
   const current = buckets.get(key);

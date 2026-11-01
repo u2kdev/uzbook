@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { SignJWT, jwtVerify } from "jose";
 import { eq } from "drizzle-orm";
 import { authSecret } from "@/server/config/env";
@@ -10,11 +12,55 @@ import { ApiError } from "./response";
 const ACCESS_TOKEN_TTL_SEC = 60 * 60; // 1 hour
 const REFRESH_TOKEN_TTL_SEC = 60 * 60 * 24 * 30; // 30 days
 
-// Track consumed refresh token JTIs so each refresh token can only be exchanged once.
-const consumedRefreshJtis = new Map<string, number>();
+// Track consumed refresh token JTIs in-memory and persist to disk so each refresh
+// token can only be exchanged once even across server restarts.
+const JTI_STORE_PATH = path.resolve(process.cwd(), ".data", "consumed-jtis.json");
+const globalForJti = globalThis as unknown as {
+  __uzbookConsumedJtis?: Map<string, number>;
+  __uzbookJtiLoaded?: boolean;
+};
+
+function getConsumedJtiMap(): Map<string, number> {
+  if (!globalForJti.__uzbookConsumedJtis) {
+    globalForJti.__uzbookConsumedJtis = new Map<string, number>();
+  }
+  if (!globalForJti.__uzbookJtiLoaded) {
+    globalForJti.__uzbookJtiLoaded = true;
+    try {
+      if (existsSync(JTI_STORE_PATH)) {
+        const raw = JSON.parse(readFileSync(JTI_STORE_PATH, "utf8")) as Record<string, number>;
+        const now = Date.now();
+        for (const [k, exp] of Object.entries(raw)) {
+          if (typeof exp === "number" && exp > now) {
+            globalForJti.__uzbookConsumedJtis.set(k, exp);
+          }
+        }
+      }
+    } catch {
+      /* ignore corrupt or missing cache file */
+    }
+  }
+  return globalForJti.__uzbookConsumedJtis;
+}
+
+function persistConsumedJtis(map: Map<string, number>) {
+  try {
+    mkdirSync(path.dirname(JTI_STORE_PATH), { recursive: true });
+    const obj: Record<string, number> = {};
+    const now = Date.now();
+    for (const [k, exp] of map) {
+      if (exp > now) obj[k] = exp;
+    }
+    writeFileSync(JTI_STORE_PATH, JSON.stringify(obj), "utf8");
+  } catch {
+    /* non-fatal if filesystem is read-only */
+  }
+}
+
 let lastJtiSweep = 0;
 
 function consumeRefreshJti(jti: string, expSeconds?: number): boolean {
+  const consumedRefreshJtis = getConsumedJtiMap();
   const now = Date.now();
   if (now - lastJtiSweep > 60_000) {
     for (const [key, expiresAt] of consumedRefreshJtis) {
@@ -28,6 +74,7 @@ function consumeRefreshJti(jti: string, expSeconds?: number): boolean {
   }
   const expiresAt = expSeconds ? expSeconds * 1000 : now + REFRESH_TOKEN_TTL_SEC * 1000;
   consumedRefreshJtis.set(jti, expiresAt);
+  persistConsumedJtis(consumedRefreshJtis);
   return true;
 }
 

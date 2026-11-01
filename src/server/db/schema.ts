@@ -140,6 +140,7 @@ export const users = pgTable(
   (t) => [
     uniqueIndex("users_email_uq").on(t.email),
     uniqueIndex("users_username_uq").on(t.username),
+    index("users_phone_idx").on(t.phone),
   ],
 );
 
@@ -349,7 +350,11 @@ export const subscriptions = pgTable(
     note: text("note"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("subscriptions_business_idx").on(t.businessId)],
+  (t) => [
+    index("subscriptions_business_idx").on(t.businessId),
+    index("subscriptions_provider_idx").on(t.providerId),
+    index("subscriptions_business_status_idx").on(t.businessId, t.status),
+  ],
 );
 
 export const payments = pgTable(

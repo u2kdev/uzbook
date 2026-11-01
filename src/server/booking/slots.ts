@@ -192,3 +192,171 @@ export async function getPreviewSlots(
   });
   return slots.slice(0, limit);
 }
+
+/**
+ * Batch-computes the next available preview day and slots for multiple staff members
+ * across a lookahead window (default 14 days) using only 3 DB queries total instead of N×14×4.
+ */
+export async function getBatchPreviewSlotsForStaff(params: {
+  staffIds: string[];
+  startDate: string;
+  daysAhead?: number;
+  timezone: string;
+  settings: BusinessSettings;
+  limitPerStaff?: number;
+}): Promise<Map<string, { date: string; slots: TimeSlot[] }>> {
+  const {
+    staffIds,
+    startDate,
+    daysAhead = 14,
+    timezone,
+    settings,
+    limitPerStaff = 5,
+  } = params;
+
+  const result = new Map<string, { date: string; slots: TimeSlot[] }>();
+  if (staffIds.length === 0) return result;
+
+  const db = await getDb();
+  const now = new Date();
+  const lastBookableDay = addDays(todayInZone(timezone), Math.max(0, settings.maxAdvanceDays));
+  const lastBookableUtc = zonedToUtc(lastBookableDay, 0, timezone).getTime();
+
+  const dates: string[] = [];
+  for (let offset = 0; offset < daysAhead; offset++) {
+    const d = addDays(startDate, offset);
+    if (zonedToUtc(d, 0, timezone).getTime() <= lastBookableUtc) {
+      dates.push(d);
+    }
+  }
+  if (dates.length === 0) return result;
+
+  const rangeStartUtc = new Date(zonedToUtc(dates[0], 0, timezone).getTime() - 86_400_000);
+  const rangeEndUtc = new Date(
+    zonedToUtc(dates[dates.length - 1], 1440, timezone).getTime() + 86_400_000,
+  );
+
+  const [hoursRows, exceptionRows, busyRows] = await Promise.all([
+    db
+      .select()
+      .from(workingHours)
+      .where(inArray(workingHours.staffId, staffIds)),
+    db
+      .select()
+      .from(scheduleExceptions)
+      .where(
+        and(
+          inArray(scheduleExceptions.staffId, staffIds),
+          inArray(scheduleExceptions.date, dates),
+        ),
+      ),
+    db
+      .select({
+        staffId: bookings.staffId,
+        startAt: bookings.startAt,
+        endAt: bookings.endAt,
+        bufferBefore: services.bufferBeforeMin,
+        bufferAfter: services.bufferAfterMin,
+      })
+      .from(bookings)
+      .innerJoin(services, eq(bookings.serviceId, services.id))
+      .where(
+        and(
+          inArray(bookings.staffId, staffIds),
+          inArray(bookings.status, ["PENDING", "CONFIRMED"]),
+          lt(bookings.startAt, rangeEndUtc),
+          gt(bookings.endAt, rangeStartUtc),
+        ),
+      ),
+  ]);
+
+  const hoursByStaffWeekday = new Map<string, { startMinute: number; endMinute: number }[]>();
+  for (const h of hoursRows) {
+    const key = `${h.staffId}:${h.weekday}`;
+    const list = hoursByStaffWeekday.get(key) ?? [];
+    list.push({ startMinute: h.startMinute, endMinute: h.endMinute });
+    hoursByStaffWeekday.set(key, list);
+  }
+
+  const exceptionsByStaffDate = new Map<string, (typeof exceptionRows)[number]>();
+  for (const ex of exceptionRows) {
+    exceptionsByStaffDate.set(`${ex.staffId}:${ex.date}`, ex);
+  }
+
+  const busyByStaff = new Map<string, Interval[]>();
+  for (const row of busyRows) {
+    const list = busyByStaff.get(row.staffId) ?? [];
+    list.push({
+      start: row.startAt.getTime() - row.bufferBefore * 60_000,
+      end: row.endAt.getTime() + row.bufferAfter * 60_000,
+    });
+    busyByStaff.set(row.staffId, list);
+  }
+
+  const stepMs = Math.max(5, settings.slotStepMin) * 60_000;
+  const durationMs = 30 * 60_000;
+  const earliest = now.getTime() + settings.leadTimeMin * 60_000;
+  const labelFormatter = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  for (const staffId of staffIds) {
+    const staffBusy = busyByStaff.get(staffId) ?? [];
+
+    for (const date of dates) {
+      const exception = exceptionsByStaffDate.get(`${staffId}:${date}`);
+      let rawIntervals: { startMinute: number; endMinute: number }[] = [];
+
+      if (exception) {
+        if (!exception.isClosed && exception.startMinute != null && exception.endMinute != null) {
+          rawIntervals = [{ startMinute: exception.startMinute, endMinute: exception.endMinute }];
+        }
+      } else {
+        const weekday = weekdayOf(date);
+        rawIntervals = hoursByStaffWeekday.get(`${staffId}:${weekday}`) ?? [];
+      }
+
+      if (rawIntervals.length === 0) continue;
+
+      const intervals: Interval[] = rawIntervals
+        .map((i) => ({
+          start: zonedToUtc(date, i.startMinute, timezone).getTime(),
+          end: zonedToUtc(date, i.endMinute, timezone).getTime(),
+        }))
+        .sort((a, b) => a.start - b.start);
+
+      const slots: TimeSlot[] = [];
+      for (const interval of intervals) {
+        let cursor = Math.max(interval.start, Math.ceil(interval.start / stepMs) * stepMs);
+        while (cursor + durationMs <= interval.end && slots.length < limitPerStaff) {
+          const occupiedStart = cursor;
+          const occupiedEnd = cursor + durationMs;
+
+          const fits = occupiedStart >= interval.start && cursor >= earliest;
+          const free = !staffBusy.some((b) => occupiedStart < b.end && occupiedEnd > b.start);
+
+          if (fits && free) {
+            slots.push({
+              start: new Date(cursor).toISOString(),
+              end: new Date(cursor + durationMs).toISOString(),
+              label: labelFormatter.format(new Date(cursor)),
+              staffId,
+            });
+          }
+          cursor += stepMs;
+        }
+        if (slots.length >= limitPerStaff) break;
+      }
+
+      if (slots.length > 0) {
+        result.set(staffId, { date, slots });
+        break;
+      }
+    }
+  }
+
+  return result;
+}

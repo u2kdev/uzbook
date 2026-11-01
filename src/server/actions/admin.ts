@@ -58,16 +58,39 @@ export async function setBusinessPlanAction(
   }
   const db = await getDb();
   const now = new Date();
-  const periodEnd = new Date(now.getTime() + (plan === "TRIAL" ? 14 : 30) * 24 * 60 * 60 * 1000);
   const planObj = planById(plan);
 
   const ok = await db.transaction(async (tx) => {
     const [existing] = await tx
-      .select({ id: businesses.id })
+      .select()
       .from(businesses)
       .where(eq(businesses.id, businessId))
       .limit(1);
     if (!existing) return false;
+
+    const [activeSub] = await tx
+      .select()
+      .from(subscriptions)
+      .where(
+        and(
+          eq(subscriptions.businessId, businessId),
+          eq(subscriptions.status, "ACTIVE"),
+        ),
+      )
+      .orderBy(desc(subscriptions.currentPeriodEnd))
+      .limit(1);
+
+    const baseDate =
+      plan !== "TRIAL" &&
+      existing.plan === plan &&
+      activeSub?.currentPeriodEnd &&
+      activeSub.currentPeriodEnd.getTime() > now.getTime()
+        ? activeSub.currentPeriodEnd
+        : now;
+
+    const periodEnd = new Date(
+      baseDate.getTime() + (plan === "TRIAL" ? 14 : 30) * 24 * 60 * 60 * 1000,
+    );
 
     await tx
       .update(subscriptions)
@@ -75,7 +98,7 @@ export async function setBusinessPlanAction(
       .where(
         and(
           eq(subscriptions.businessId, businessId),
-          inArray(subscriptions.status, ["ACTIVE", "PENDING"]),
+          inArray(subscriptions.status, ["ACTIVE", "PENDING", "TRIAL"]),
         ),
       );
 
@@ -87,12 +110,24 @@ export async function setBusinessPlanAction(
       })
       .where(eq(businesses.id, businessId));
 
+    const effectiveAmount =
+      plan === "TRIAL"
+        ? 0
+        : existing.customPriceUzs !== null &&
+            existing.customPriceUzs !== undefined &&
+            existing.customPriceUzs > 0
+          ? existing.customPriceUzs
+          : planObj.priceUzs;
+
     await tx.insert(subscriptions).values({
       businessId,
+      providerId: existing.providerId ?? null,
       plan,
       status: plan === "TRIAL" ? "TRIAL" : "ACTIVE",
       provider: "MANUAL",
-      amount: planObj.priceUzs,
+      amount: effectiveAmount,
+      customStaffLimit: existing.customStaffLimit ?? null,
+      customClientLimit: existing.customClientLimit ?? null,
       startedAt: now,
       currentPeriodEnd: periodEnd,
       note: `Тариф установлен администратором (${plan})`,

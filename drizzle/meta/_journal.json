@@ -57,6 +57,13 @@
       "when": 1793040000000,
       "tag": "0007_providers_and_logos",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793050000000,
+      "tag": "0008_p2_indexes_and_constraints",
+      "breakpoints": true
     }
   ]
 }

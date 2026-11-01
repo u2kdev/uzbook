@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, ne, or, sql } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import {
   businesses,
@@ -294,6 +294,19 @@ export async function updateProviderSettingsAction(
   };
 
   if (username && username.length >= 3) {
+    if (!/^[a-z0-9_.-]+$/.test(username)) {
+      return {
+        error: "Никнейм может содержать только латинские буквы, цифры, _, - или .",
+      };
+    }
+    const [taken] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.username, username), ne(users.id, providerId)))
+      .limit(1);
+    if (taken) {
+      return { error: "Этот никнейм уже занят другим пользователем" };
+    }
     updates.username = username;
   }
   if (newPassword && newPassword.length >= 6) {
@@ -537,10 +550,10 @@ export async function providerCustomizeSubscriptionAction(
 
   const now = new Date();
   const safeTrialDays = trialDays > 0 ? Math.max(14, Math.min(30, trialDays)) : 0;
-  const newTrialEndsAt =
-    safeTrialDays > 0
-      ? new Date(now.getTime() + safeTrialDays * 24 * 60 * 60 * 1000)
-      : business.trialEndsAt;
+  const shouldUpdateTrial = safeTrialDays > 0 && business.plan === "TRIAL";
+  const newTrialEndsAt = shouldUpdateTrial
+    ? new Date(now.getTime() + safeTrialDays * 24 * 60 * 60 * 1000)
+    : business.trialEndsAt;
 
   const commissionPercent = providerUser.commissionPercent ?? 60;
   const providerPayoutAmount = Math.round((customPriceUzs * commissionPercent) / 100);
@@ -552,11 +565,46 @@ export async function providerCustomizeSubscriptionAction(
         customStaffLimit,
         customClientLimit,
         customPriceUzs,
-        ...(safeTrialDays > 0 ? { plan: "TRIAL", trialEndsAt: newTrialEndsAt } : {}),
+        ...(shouldUpdateTrial ? { plan: "TRIAL", trialEndsAt: newTrialEndsAt } : {}),
       })
       .where(eq(businesses.id, business.id));
 
+    if (shouldUpdateTrial && newTrialEndsAt) {
+      await tx
+        .update(subscriptions)
+        .set({
+          customStaffLimit,
+          customClientLimit,
+          currentPeriodEnd: newTrialEndsAt,
+        })
+        .where(
+          and(eq(subscriptions.businessId, business.id), eq(subscriptions.status, "TRIAL")),
+        );
+    }
+
     if (createPaymentRequest && customPriceUzs > 0) {
+      const [activeSub] = await tx
+        .select()
+        .from(subscriptions)
+        .where(
+          and(
+            eq(subscriptions.businessId, business.id),
+            eq(subscriptions.status, "ACTIVE"),
+          ),
+        )
+        .orderBy(desc(subscriptions.currentPeriodEnd))
+        .limit(1);
+
+      const basePeriodStart =
+        activeSub?.currentPeriodEnd && activeSub.currentPeriodEnd.getTime() > now.getTime()
+          ? activeSub.currentPeriodEnd
+          : now;
+      const nextPeriodEnd = new Date(basePeriodStart.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const targetPlan: PlanId =
+        business.plan !== "TRIAL" && ["START", "PRO", "BUSINESS"].includes(business.plan)
+          ? business.plan
+          : "PRO";
+
       await tx
         .update(subscriptions)
         .set({ status: "CANCELLED" })
@@ -567,7 +615,7 @@ export async function providerCustomizeSubscriptionAction(
       await tx.insert(subscriptions).values({
         businessId: business.id,
         providerId: providerUser.id,
-        plan: "PRO",
+        plan: targetPlan,
         status: "PENDING",
         provider: "MANUAL",
         amount: customPriceUzs,
@@ -577,7 +625,7 @@ export async function providerCustomizeSubscriptionAction(
         providerCommissionPercent: commissionPercent,
         providerPayoutAmount,
         startedAt: now,
-        currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+        currentPeriodEnd: nextPeriodEnd,
         note: `Кастомная подписка от провайдера ${providerUser.name}: ${customStaffLimit} сотр., ${customClientLimit} людей, цена ${customPriceUzs.toLocaleString("ru-RU")} сум (на карту провайдера ${commissionPercent}% = ${providerPayoutAmount.toLocaleString("ru-RU")} сум)`,
       });
     }
