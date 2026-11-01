@@ -535,6 +535,11 @@ export async function providerCustomizeSubscriptionAction(
   const trialDays = Math.max(0, Math.min(30, Math.round(Number(formData.get("trialDays") ?? 0) || 0)));
   const customPriceUzs = Math.max(0, Math.round(Number(String(formData.get("customPriceUzs") ?? "199000").replace(/\s+/g, "")) || 199000));
   const createPaymentRequest = formData.get("createPaymentRequest") === "true";
+  const newOwnerPassword = String(formData.get("newOwnerPassword") ?? "").trim();
+
+  if (newOwnerPassword && newOwnerPassword.length < 6) {
+    return { error: "Новый пароль клиента должен содержать минимум 6 символов" };
+  }
 
   const [business] = await db
     .select()
@@ -559,6 +564,14 @@ export async function providerCustomizeSubscriptionAction(
   const providerPayoutAmount = Math.round((customPriceUzs * commissionPercent) / 100);
 
   await db.transaction(async (tx) => {
+    if (newOwnerPassword) {
+      const passwordHash = await hashPassword(newOwnerPassword);
+      await tx
+        .update(users)
+        .set({ passwordHash })
+        .where(eq(users.id, business.ownerId));
+    }
+
     await tx
       .update(businesses)
       .set({

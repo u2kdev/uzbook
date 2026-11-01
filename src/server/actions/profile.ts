@@ -5,7 +5,13 @@ import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/server/db";
 import { businesses, subscriptions, users, type BusinessSettings } from "@/server/db/schema";
-import { requireUser } from "@/server/auth/session";
+import {
+  hashPassword,
+  requireUser,
+  setSessionCookie,
+  verifyPassword,
+} from "@/server/auth/session";
+import { normalizeAuthPhone } from "@/lib/phone";
 import { isValidSlug, slugify } from "@/lib/slug";
 import { planById, type PlanId } from "@/lib/plans";
 import { recordAuditLog } from "@/server/payments/service";
@@ -125,6 +131,48 @@ export async function updateProfileAction(
   };
 
   const emptyToNull = (value: string) => (value.trim() === "" ? null : value.trim());
+
+  const currentPassword = String(formData.get("currentPassword") ?? "").trim();
+  const newPassword = String(formData.get("newPassword") ?? "").trim();
+
+  if (newPassword) {
+    if (newPassword.length < 6) {
+      return { error: "Новый пароль должен содержать минимум 6 символов" };
+    }
+    const [ownerRow] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, business.ownerId))
+      .limit(1);
+    if (!ownerRow) return { error: "Пользователь не найден" };
+    if (!currentPassword || !(await verifyPassword(currentPassword, ownerRow.passwordHash))) {
+      return { error: "Неверный текущий пароль" };
+    }
+    const newHash = await hashPassword(newPassword);
+    const [updatedUser] = await db
+      .update(users)
+      .set({ passwordHash: newHash })
+      .where(eq(users.id, ownerRow.id))
+      .returning();
+    if (updatedUser) {
+      await setSessionCookie(updatedUser);
+    }
+  }
+
+  const normalizedPhone = parsed.data.phone ? normalizeAuthPhone(parsed.data.phone) : "";
+  if (normalizedPhone && normalizedPhone.replace(/\D/g, "").length >= 7) {
+    const [phoneConflict] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.phone, normalizedPhone), ne(users.id, business.ownerId)))
+      .limit(1);
+    if (!phoneConflict) {
+      await db
+        .update(users)
+        .set({ phone: normalizedPhone })
+        .where(eq(users.id, business.ownerId));
+    }
+  }
 
   await db
     .update(businesses)

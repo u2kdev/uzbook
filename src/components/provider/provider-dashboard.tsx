@@ -698,6 +698,18 @@ export function ProviderDashboard({
                               className="input-base h-10 font-semibold"
                             />
                           </div>
+                          <div className="sm:col-span-2 lg:col-span-4">
+                            <label className="label-base">
+                              Новый пароль клиента (оставьте пустым, если не меняете)
+                            </label>
+                            <input
+                              name="newOwnerPassword"
+                              type="password"
+                              minLength={6}
+                              placeholder="Минимум 6 символов для сброса пароля владельца салона"
+                              className="input-base h-10"
+                            />
+                          </div>
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-3">

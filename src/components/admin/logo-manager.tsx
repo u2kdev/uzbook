@@ -98,6 +98,11 @@ export function LogoManager({
                 {state.error}
               </div>
             )}
+            {state?.ok && (
+              <div className="sm:col-span-2 lg:col-span-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-[12.5px] font-medium text-emerald-900">
+                Логотип успешно добавлен в карусель!
+              </div>
+            )}
 
             <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
               <button
@@ -140,6 +145,8 @@ export function LogoManager({
                     <img
                       src={logo.imageUrl}
                       alt={logo.name}
+                      loading="lazy"
+                      decoding="async"
                       className="max-h-9 max-w-full object-contain"
                     />
                   </div>
@@ -171,6 +178,7 @@ export function LogoManager({
                       type="button"
                       disabled={isMutating}
                       onClick={() => {
+                        if (!window.confirm(`Удалить логотип «${logo.name}» из карусели?`)) return;
                         startTransition(async () => {
                           await deleteTrustedLogoAction(logo.id);
                           router.refresh();

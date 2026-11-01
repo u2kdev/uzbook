@@ -434,6 +434,42 @@ export function ProfileEditor({
               />
             </div>
           </SectionCard>
+
+          <SectionCard
+            icon={ShieldAlert}
+            title="Безопасность аккаунта (смена пароля)"
+            description="Оставьте поля пустыми, если не планируете менять пароль для входа."
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="currentPassword" className="label-base">
+                  Текущий пароль
+                </label>
+                <input
+                  id="currentPassword"
+                  name="currentPassword"
+                  type="password"
+                  autoComplete="current-password"
+                  className="input-base"
+                  placeholder="••••••••"
+                />
+              </div>
+              <div>
+                <label htmlFor="newPassword" className="label-base">
+                  Новый пароль (минимум 6 символов)
+                </label>
+                <input
+                  id="newPassword"
+                  name="newPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={6}
+                  className="input-base"
+                  placeholder="Новый пароль"
+                />
+              </div>
+            </div>
+          </SectionCard>
         </div>
 
         <div className="space-y-5">

@@ -42,6 +42,8 @@ export function TrustedLogosCarousel({ logos }: { logos: TrustedLogo[] }) {
                     <img
                       src={item.imageUrl}
                       alt={item.name}
+                      loading="lazy"
+                      decoding="async"
                       className="max-h-10 max-w-[130px] object-contain transition-transform duration-300 group-hover:scale-105"
                     />
                   ) : (
