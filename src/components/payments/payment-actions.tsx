@@ -2,9 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, Check, Copy, Loader2, RefreshCw, ShieldCheck, Sparkles, Coins } from "lucide-react";
+import { ArrowUpRight, Check, Copy, Loader2, RefreshCw, ShieldCheck, Coins } from "lucide-react";
 import { confirmDemoPaymentAction, confirmCryptoPaymentAction } from "@/server/actions/payments";
-import { useTelegramWebApp } from "@/components/telegram/telegram-webapp-provider";
 
 export function PaymentActions({
   externalId,
@@ -20,30 +19,12 @@ export function PaymentActions({
   payload?: Record<string, unknown>;
 }) {
   const router = useRouter();
-  const { isAvailable, openInvoice, haptic } = useTelegramWebApp();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [txHash, setTxHash] = useState(String(payload?.txHash ?? ""));
   const [copied, setCopied] = useState(false);
   const [cryptoSubmitted, setCryptoSubmitted] = useState(Boolean(payload?.txHash));
-
-  const handleOpenStars = () => {
-    if (!checkoutUrl) return;
-    if (isAvailable && provider === "TELEGRAM_STARS") {
-      openInvoice(checkoutUrl, (status) => {
-        if (status === "paid") {
-          haptic.success();
-          router.refresh();
-        } else if (status === "failed") {
-          haptic.error();
-          setError("Оплата в Telegram Stars не удалась.");
-        }
-      });
-    } else {
-      window.open(checkoutUrl, "_blank");
-    }
-  };
 
   useEffect(() => {
     const timer = setInterval(() => router.refresh(), 5000);
@@ -112,15 +93,6 @@ export function PaymentActions({
             <ShieldCheck className="size-4" />
           )}
           {pending ? "Активируем тариф…" : "Оплатить (тест)"}
-        </button>
-      ) : provider === "TELEGRAM_STARS" ? (
-        <button
-          type="button"
-          onClick={handleOpenStars}
-          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#007aff] px-5 text-[13px] font-semibold text-white transition hover:opacity-90 shadow-sm"
-        >
-          <Sparkles className="size-4" />
-          {isAvailable ? "Оплатить Telegram Stars в приложении" : "Перейти к счёту в Telegram"}
         </button>
       ) : provider === "CRYPTO" ? (
         <div className="space-y-3 rounded-2xl bg-paper p-4 ring-1 ring-line/80">

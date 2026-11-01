@@ -16,7 +16,6 @@
     "db:reset-passwords": "tsx scripts/reset-test-passwords.ts",
     "admin:create": "tsx scripts/create-admin.ts",
     "maintenance": "tsx scripts/maintenance.ts",
-    "bot": "tsx bot/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -29,7 +28,6 @@
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "drizzle-orm": "^0.45.4",
-    "grammy": "^1.38.4",
     "jose": "^6.1.0",
     "lucide-react": "^0.548.0",
     "next": "^16.4.3",

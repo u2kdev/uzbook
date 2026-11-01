@@ -45,9 +45,6 @@ jobs:
       - name: Billing & Plans test
         run: npx tsx scripts/test-billing-feature.ts
 
-      - name: Telegram integration test
-        run: npx tsx scripts/test-telegram-production.ts
-
       - name: Payments lifecycle test
         run: npx tsx scripts/test-payments-lifecycle.ts
 

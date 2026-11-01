@@ -18,12 +18,10 @@ import {
 import {
   buildClickCheckoutUrl,
   buildPaymeCheckoutUrl,
-  createTelegramInvoice,
   demoPaymentsEnabled,
   type PaymentProviderId,
 } from "./config";
 import { logger } from "@/server/logger";
-import { notifyPaymentCompleted } from "@/server/telegram/notify";
 
 const PERIOD_DAYS = SUBSCRIPTION_PERIOD_DAYS;
 const PERIOD_MS = SUBSCRIPTION_PERIOD_MS;
@@ -71,15 +69,6 @@ export async function createPayment(params: {
     if (!checkoutUrl) throw new Error("Click не настроен");
     url = checkoutUrl;
     payload = { checkoutUrl };
-  } else if (provider === "TELEGRAM_STARS") {
-    const invoiceUrl = await createTelegramInvoice({
-      plan,
-      externalId,
-      businessName: business.name,
-    });
-    if (!invoiceUrl) throw new Error("Не удалось создать счёт в Telegram");
-    url = invoiceUrl;
-    payload = { invoiceUrl };
   } else if (provider === "CRYPTO") {
     const { cryptoDepositConfig } = await import("./config");
     const conf = cryptoDepositConfig();
@@ -319,17 +308,6 @@ export async function completePayment(params: {
       periodEnd,
     };
   });
-
-  if (res.ok && !res.alreadyPaid) {
-    void notifyPaymentCompleted({
-      businessId: res.business.id,
-      plan: res.payment.plan,
-      amount: res.payment.amount,
-      currency: res.payment.currency,
-      provider: res.payment.provider,
-      periodEnd: res.periodEnd,
-    });
-  }
 
   return res;
 }

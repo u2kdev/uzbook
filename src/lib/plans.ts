@@ -14,8 +14,6 @@ export type Plan = {
   staffLimit: number;
   serviceLimit: number;
   storageMb: number;
-  /** Price in Telegram Stars (XTR) for a 30-day period. */
-  starsPrice: number;
   features: string[];
   highlighted?: boolean;
 };
@@ -30,11 +28,10 @@ export const PLANS: Plan[] = [
     staffLimit: 2,
     serviceLimit: 10,
     storageMb: 200,
-    starsPrice: 0,
     features: [
       "Страница записи и ссылка",
       "До 2 мастеров",
-      "Таймлайн и уведомления",
+      "Таймлайн записей",
       "Запись без логина для клиента",
     ],
   },
@@ -47,11 +44,10 @@ export const PLANS: Plan[] = [
     staffLimit: 1,
     serviceLimit: 30,
     storageMb: 500,
-    starsPrice: 600,
     features: [
       "Всё из пробного",
       "Свой адрес страницы",
-      "Напоминания в Telegram",
+      "Онлайн-запись 24/7",
       "Перенос и отмена по ссылке",
     ],
   },
@@ -64,7 +60,6 @@ export const PLANS: Plan[] = [
     staffLimit: 8,
     serviceLimit: 200,
     storageMb: 2_000,
-    starsPrice: 1_200,
     features: [
       "Всё из «Старт»",
       "До 8 мастеров",
@@ -83,7 +78,6 @@ export const PLANS: Plan[] = [
     staffLimit: 30,
     serviceLimit: 1_000,
     storageMb: 10_000,
-    starsPrice: 2_400,
     features: [
       "Всё из «Про»",
       "До 30 мастеров",

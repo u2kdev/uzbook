@@ -81,13 +81,6 @@ export type BusinessSettings = {
   autoConfirm: boolean;
   showPrices: boolean;
   requireEmail: boolean;
-  telegramNotifications?: {
-    newBooking?: boolean;
-    cancelled?: boolean;
-    rescheduled?: boolean;
-    payment?: boolean;
-    digest?: boolean;
-  };
 };
 
 export type BusinessTheme = {
@@ -139,13 +132,9 @@ export const users = pgTable(
     name: text("name").notNull(),
     phone: text("phone"),
     role: userRoleEnum("role").notNull().default("OWNER"),
-    telegramId: text("telegram_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    uniqueIndex("users_email_uq").on(t.email),
-    uniqueIndex("users_telegram_uq").on(t.telegramId),
-  ],
+  (t) => [uniqueIndex("users_email_uq").on(t.email)],
 );
 
 export const businesses = pgTable(
@@ -280,7 +269,6 @@ export const clients = pgTable(
     name: text("name").notNull(),
     phone: text("phone").notNull(),
     email: text("email"),
-    telegramId: text("telegram_id"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

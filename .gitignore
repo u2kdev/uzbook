@@ -3,6 +3,7 @@ node_modules
 out
 build
 .data
+.aws
 .env
 .env.local
 *.tsbuildinfo

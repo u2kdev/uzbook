@@ -59,7 +59,6 @@ export function PageEditor({
   publicUrl,
   servicesCount,
   staffCount,
-  telegram,
   sections,
   galleryImages,
 }: {
@@ -70,12 +69,6 @@ export function PageEditor({
   publicUrl: string;
   servicesCount: number;
   staffCount: number;
-  telegram: {
-    configured: boolean;
-    link: string | null;
-    connected?: boolean;
-    telegramId?: string | null;
-  };
   sections: PageSection[];
   galleryImages: GalleryImage[];
 }) {
@@ -320,7 +313,6 @@ export function PageEditor({
             publicUrl={publicUrl}
             servicesCount={servicesCount}
             staffCount={staffCount}
-            telegram={telegram}
           />
         </TabsContent>
 

@@ -6,23 +6,17 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   Check,
-  CheckCircle2,
   ExternalLink,
   Loader2,
   MapPin,
-  MessageCircle,
   Palette,
   Settings2,
   ShieldAlert,
   Store,
   Phone,
-  Send,
-  Unlink,
 } from "lucide-react";
 import {
   updateProfileAction,
-  unlinkTelegramAction,
-  updateTelegramNotificationSettingsAction,
   type ProfileState,
 } from "@/server/actions/profile";
 import { slugify } from "@/lib/slug";
@@ -44,13 +38,6 @@ type Settings = {
   autoConfirm: boolean;
   showPrices: boolean;
   requireEmail: boolean;
-  telegramNotifications?: {
-    newBooking?: boolean;
-    cancelled?: boolean;
-    rescheduled?: boolean;
-    payment?: boolean;
-    digest?: boolean;
-  };
 };
 
 export type ProfileBusiness = {
@@ -129,18 +116,11 @@ export function ProfileEditor({
   publicUrl,
   servicesCount,
   staffCount,
-  telegram,
 }: {
   business: ProfileBusiness;
   publicUrl: string;
   servicesCount: number;
   staffCount: number;
-  telegram: {
-    configured: boolean;
-    link: string | null;
-    connected?: boolean;
-    telegramId?: string | null;
-  };
 }) {
   const [state, formAction, pending] = useActionState<ProfileState, FormData>(
     updateProfileAction,
@@ -149,38 +129,6 @@ export function ProfileEditor({
   const [accent, setAccent] = useState(business.accent);
   const [name, setName] = useState(business.name);
   const [tagline, setTagline] = useState(business.tagline ?? "");
-  const [unlinking, setUnlinking] = useState(false);
-  const [notifSettings, setNotifSettings] = useState({
-    newBooking: business.settings.telegramNotifications?.newBooking ?? true,
-    cancelled: business.settings.telegramNotifications?.cancelled ?? true,
-    rescheduled: business.settings.telegramNotifications?.rescheduled ?? true,
-    payment: business.settings.telegramNotifications?.payment ?? true,
-    digest: business.settings.telegramNotifications?.digest ?? false,
-  });
-  const [savingNotifs, setSavingNotifs] = useState(false);
-
-  const handleToggleNotif = async (key: keyof typeof notifSettings) => {
-    const next = { ...notifSettings, [key]: !notifSettings[key] };
-    setNotifSettings(next);
-    setSavingNotifs(true);
-    try {
-      await updateTelegramNotificationSettingsAction(next);
-    } finally {
-      setSavingNotifs(false);
-    }
-  };
-
-  const handleUnlink = async () => {
-    if (!confirm("Вы уверены, что хотите отвязать Telegram? Уведомления перестанут приходить.")) {
-      return;
-    }
-    setUnlinking(true);
-    try {
-      await unlinkTelegramAction();
-    } finally {
-      setUnlinking(false);
-    }
-  };
 
   return (
     <form action={formAction} className="space-y-5 pb-24">
@@ -314,7 +262,7 @@ export function ProfileEditor({
           <SectionCard
             icon={MapPin}
             title="Контакты"
-            description="Появятся на странице записи и в напоминаниях."
+            description="Появятся на странице записи."
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -482,7 +430,7 @@ export function ProfileEditor({
                 name="requireEmail"
                 defaultChecked={business.settings.requireEmail}
                 label="Спрашивать email"
-                hint="Полезно для чеков и напоминаний на почту."
+                hint="Полезно для чеков и связи с клиентом."
               />
             </div>
           </SectionCard>
@@ -523,123 +471,11 @@ export function ProfileEditor({
             </div>
           </div>
 
-          {/* Telegram */}
-          <div className="rounded-[24px] bg-white p-5 ring-1 ring-line/80">
-            <div className="flex items-center gap-3">
-              <span className="grid size-9 place-items-center rounded-xl bg-[#e8f3fd] text-[#229ed9]">
-                <Send size={17} strokeWidth={1.7} />
-              </span>
-              <div>
-                <p className="text-[13.5px] font-semibold">Telegram-уведомления</p>
-                <p className="text-[11px] text-muted">Новые записи, отмены и напоминания</p>
-              </div>
-            </div>
-
-            {telegram.connected ? (
-              <div className="mt-4 space-y-3.5">
-                <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3.5 py-2.5 border border-emerald-200">
-                  <div className="flex items-center gap-2 text-emerald-800 text-[12px] font-medium">
-                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-                    <span>Подключен {telegram.telegramId ? `(ID: ${telegram.telegramId})` : ""}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleUnlink}
-                    disabled={unlinking}
-                    className="flex items-center gap-1 text-[11px] font-medium text-rose hover:underline"
-                  >
-                    {unlinking ? <Loader2 size={12} className="animate-spin" /> : <Unlink size={12} />}
-                    Отвязать
-                  </button>
-                </div>
-
-                <div className="pt-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">
-                    Типы уведомлений {savingNotifs && <Loader2 size={10} className="inline ml-1 animate-spin" />}
-                  </p>
-                  <div className="space-y-1.5 text-[12px]">
-                    <label className="flex items-center justify-between cursor-pointer rounded-lg px-2.5 py-1.5 hover:bg-paper">
-                      <span>🔔 Новые записи</span>
-                      <input
-                        type="checkbox"
-                        checked={notifSettings.newBooking}
-                        onChange={() => handleToggleNotif("newBooking")}
-                        className="size-4 accent-[var(--color-brand)]"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between cursor-pointer rounded-lg px-2.5 py-1.5 hover:bg-paper">
-                      <span>🔄 Отмены и переносы</span>
-                      <input
-                        type="checkbox"
-                        checked={notifSettings.cancelled && notifSettings.rescheduled}
-                        onChange={() => {
-                          const nextVal = !(notifSettings.cancelled && notifSettings.rescheduled);
-                          const next = { ...notifSettings, cancelled: nextVal, rescheduled: nextVal };
-                          setNotifSettings(next);
-                          setSavingNotifs(true);
-                          updateTelegramNotificationSettingsAction(next).finally(() => setSavingNotifs(false));
-                        }}
-                        className="size-4 accent-[var(--color-brand)]"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between cursor-pointer rounded-lg px-2.5 py-1.5 hover:bg-paper">
-                      <span>💳 Оплаты и подписка</span>
-                      <input
-                        type="checkbox"
-                        checked={notifSettings.payment}
-                        onChange={() => handleToggleNotif("payment")}
-                        className="size-4 accent-[var(--color-brand)]"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between cursor-pointer rounded-lg px-2.5 py-1.5 hover:bg-paper">
-                      <span>📊 Утренний дайджест</span>
-                      <input
-                        type="checkbox"
-                        checked={notifSettings.digest}
-                        onChange={() => handleToggleNotif("digest")}
-                        className="size-4 accent-[var(--color-brand)]"
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-            ) : telegram.configured ? (
-              telegram.link ? (
-                <>
-                  <p className="mt-3.5 text-[12px] leading-relaxed text-muted">
-                    Привяжите Telegram — и бот будет присылать записи, отмены и переносы. Ссылка
-                    действует 7 дней.
-                  </p>
-                  <Link
-                    href={telegram.link}
-                    target="_blank"
-                    className="btn btn-ghost mt-3.5 h-10 w-full text-[12px]"
-                  >
-                    <MessageCircle size={14} strokeWidth={1.7} />
-                    Подключить Telegram
-                    <ArrowUpRight size={13} strokeWidth={1.7} />
-                  </Link>
-                </>
-              ) : (
-                <p className="mt-3.5 text-[12px] leading-relaxed text-muted">
-                  Бот настроен, но не указан <code className="text-ink">TELEGRAM_BOT_USERNAME</code>{" "}
-                  в .env — ссылка появится после перезапуска.
-                </p>
-              )
-            ) : (
-              <p className="mt-3.5 text-[12px] leading-relaxed text-muted">
-                Чтобы включить, запустите бота и добавьте в <code className="text-ink">.env</code>{" "}
-                <code className="text-ink">TELEGRAM_BOT_TOKEN</code> и{" "}
-                <code className="text-ink">TELEGRAM_BOT_USERNAME</code>.
-              </p>
-            )}
-          </div>
-
           <div className="rounded-[24px] border border-line/80 bg-paper/60 p-5">
             <p className="text-[12px] font-semibold">Клиент не регистрируется</p>
             <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted">
               После записи он получает ссылку на управление: перенести или отменить можно без
-              логина. Ссылка приходит на страницу после брони и в Telegram владельцу.
+              логина. Ссылка показывается на странице сразу после брони.
             </p>
             <Link
               href="/dashboard/bookings"

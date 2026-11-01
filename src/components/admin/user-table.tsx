@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Search, Send } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { setUserRoleAction } from "@/server/actions/admin";
 
 export type AdminUserItem = {
@@ -11,7 +11,6 @@ export type AdminUserItem = {
   email: string;
   phone: string | null;
   role: "OWNER" | "SUPPORT" | "ADMIN";
-  telegramLinked: boolean;
   createdAt: string;
   businessesCount: number;
   businessNames: string[];
@@ -79,11 +78,6 @@ export function UserTable({
                   {row.isSelf && (
                     <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[9px] font-semibold text-brand-dark">
                       вы
-                    </span>
-                  )}
-                  {row.telegramLinked && (
-                    <span title="Telegram подключён" className="text-[#229ed9]">
-                      <Send size={11} strokeWidth={2} />
                     </span>
                   )}
                 </p>

@@ -59,7 +59,7 @@ export default async function BillingPage() {
           Тариф и оплата
         </h1>
         <p className="mt-1 text-[12.5px] text-muted">
-          Один тариф на бизнес: страница записи, мастера, услуги и уведомления.
+          Один тариф на бизнес: страница записи, мастера, услуги и журнал записей.
         </p>
       </div>
 
@@ -149,7 +149,7 @@ export default async function BillingPage() {
             {
               step: "2",
               title: "Оплатите",
-              text: "Payme, Click, Telegram Stars или тестовый платёж — на выбор.",
+              text: "Payme, Click, крипта или тестовый платёж — на выбор.",
             },
             {
               step: "3",

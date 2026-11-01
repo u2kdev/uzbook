@@ -16,8 +16,6 @@ const cormorant = Cormorant_Garamond({
   display: "swap",
 });
 
-import { TelegramWebAppProvider } from "@/components/telegram/telegram-webapp-provider";
-
 export const metadata: Metadata = {
   title: {
     default: "uzbook — запись клиентов для малого бизнеса",
@@ -31,9 +29,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru" className={`${onest.variable} ${cormorant.variable}`} suppressHydrationWarning>
-      <body suppressHydrationWarning>
-        <TelegramWebAppProvider>{children}</TelegramWebAppProvider>
-      </body>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

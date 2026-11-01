@@ -1,7 +1,7 @@
 # Single-container install for a small server.
 # Uses embedded PGlite; data and uploads live in the app_data volume.
-# PGlite allows only one process, so a separate Telegram bot does not work:
-# use docker-compose.yml with PostgreSQL if you need the bot container.
+# PGlite allows only one process, so scheduled maintenance must run in-process:
+# use docker-compose.yml with PostgreSQL if you need separate worker containers.
 services:
   app:
     build:

@@ -9,8 +9,7 @@
 - **Web & API Backend:** Next.js 16 (App Router, Node.js runtime, standalone container).
 - **База данных:** PostgreSQL 17 (Drizzle ORM).
 - **Интеграции:**
-  - Платежи: Payme, Click, Telegram Stars, Crypto (USDT TRC-20/TON), ручные заявки.
-  - Telegram: бот (`@uzbook_bot`), Webhook + Mini App (`initData` crypto-validation).
+  - Платежи: Payme, Click, Crypto (USDT TRC-20/TON), ручные заявки.
   - Мобильное приложение: Expo React Native (REST API `/api/v1` с Bearer JWT).
 - **Обратный прокси:** Nginx с TLS (Let's Encrypt Certbot), rate-limiting и HTTP/2.
 
@@ -30,10 +29,8 @@
 | `CLICK_SECRET_KEY` | Секретный ключ подписи Click | из кабинета мерчанта Click |
 | `PAYME_MERCHANT_ID` | Идентификатор мерчанта Payme | из кабинета Paycom |
 | `PAYME_KEY` | Секретный ключ мерчанта Payme | из кабинета Paycom |
-| `TELEGRAM_BOT_TOKEN`| Токен бота от BotFather | `123456:ABC-DEF...` |
-| `TELEGRAM_BOT_USERNAME`| Юзернейм бота | `uzbook_bot` |
-| `TELEGRAM_WEBHOOK_SECRET` | Секрет заголовка Telegram | `openssl rand -hex 24` |
-| `TELEGRAM_MINIAPP_URL`| URL веб-приложения Mini App | `https://uzbook.uz/dashboard` |
+| `CRYPTO_DEPOSIT_ADDRESS` | Адрес для криптоплатежей | `T...` |
+| `CRYPTO_NETWORK` | Сеть и актив | `TRC-20 (TRON)` |
 
 ---
 

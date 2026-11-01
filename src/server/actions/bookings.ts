@@ -6,7 +6,6 @@ import { getDb } from "@/server/db";
 import { bookings, businesses, services, staff, staffServices } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { createBooking } from "@/server/booking/service";
-import { notifyBookingCancelled, notifyBookingRescheduled } from "@/server/telegram/notify";
 
 export type StatusActionResult = { ok: boolean; error?: string };
 
@@ -40,10 +39,6 @@ export async function setBookingStatus(
     .returning({ id: bookings.id });
 
   if (updated.length === 0) return { ok: false, error: "Запись не найдена или нет доступа" };
-
-  if (status === "CANCELLED") {
-    void notifyBookingCancelled(bookingId);
-  }
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/bookings");
@@ -204,8 +199,6 @@ export async function ownerRescheduleBookingAction(input: {
   });
 
   if (!moved) return { ok: false, error: "Это время уже занято другим клиентом" };
-
-  void notifyBookingRescheduled(booking.id);
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/bookings");

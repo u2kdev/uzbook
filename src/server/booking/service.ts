@@ -14,11 +14,6 @@ import {
 } from "@/server/db/schema";
 import { dateInZone } from "./time";
 import { getAvailableSlots } from "./slots";
-import {
-  notifyBookingCancelled,
-  notifyBookingRescheduled,
-  notifyNewBooking,
-} from "@/server/telegram/notify";
 import { logger } from "@/server/logger";
 
 export type BookingFailure =
@@ -55,8 +50,7 @@ export async function createBooking(input: {
   phone: string;
   email?: string | null;
   note?: string | null;
-  source?: "WEB" | "TELEGRAM" | "MANUAL";
-  telegramId?: string | null;
+  source?: "WEB" | "MANUAL";
 }): Promise<Result<{ id: string; manageToken: string; startAt: Date; endAt: Date }>> {
   const db = await getDb();
   const start = new Date(input.startAt);
@@ -158,14 +152,12 @@ export async function createBooking(input: {
           name: input.name.trim().slice(0, 120),
           phone,
           email: input.email?.trim() || null,
-          telegramId: input.telegramId ?? null,
         })
         .onConflictDoUpdate({
           target: [clients.businessId, clients.phone],
           set: {
-            // Preserve existing CRM client name/email if already set; only fill missing email or verified telegramId
+            // Preserve existing CRM client name/email if already set; only fill missing email.
             email: sql`coalesce(${clients.email}, ${input.email?.trim() || null})`,
-            ...(input.telegramId ? { telegramId: input.telegramId } : {}),
           },
         })
         .returning();
@@ -206,7 +198,6 @@ export async function createBooking(input: {
       source: input.source ?? "WEB",
     });
 
-    void notifyNewBooking(created.row.id);
     return {
       ok: true,
       data: { id: created.row.id, manageToken, startAt: start, endAt: end },
@@ -335,7 +326,6 @@ export async function cancelBooking(
     reason: reason ?? null,
   });
 
-  void notifyBookingCancelled(booking.id);
   return { ok: true, data: { id: booking.id } };
 }
 
@@ -435,6 +425,5 @@ export async function rescheduleBooking(
     newStartAt: start.toISOString(),
   });
 
-  void notifyBookingRescheduled(booking.id);
   return { ok: true, data: { startAt: start, endAt: end } };
 }

@@ -20,7 +20,7 @@ export default async function AdminUsersPage() {
         </h1>
         <p className="mt-1 text-[12.5px] text-muted">
           {users.length} аккаунтов · {users.filter((row) => row.businessesCount > 0).length} с
-          бизнесом · {users.filter((row) => row.user.telegramId).length} с Telegram
+          бизнесом
         </p>
       </div>
 
@@ -32,7 +32,6 @@ export default async function AdminUsersPage() {
           email: user.email,
           phone: user.phone,
           role: user.role,
-          telegramLinked: Boolean(user.telegramId),
           createdAt: user.createdAt.toISOString(),
           businessesCount,
           businessNames,

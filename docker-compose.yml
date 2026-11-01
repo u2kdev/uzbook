@@ -47,12 +47,11 @@ services:
       db:
         condition: service_healthy
 
-  # Hourly subscription expiry + abandoned payment cleanup. Reuses the bot
-  # image because it includes tsx and the scripts folder.
+  # Hourly subscription expiry + abandoned payment cleanup.
   maintenance:
     build:
       context: .
-      target: bot
+      target: maintenance
     restart: unless-stopped
     init: true
     env_file:
@@ -74,27 +73,6 @@ services:
         "-c",
         "while true; do node ./node_modules/tsx/dist/cli.mjs scripts/maintenance.ts; sleep 3600; done",
       ]
-
-  # Optional: docker compose --profile bot up -d --build bot
-  # Requires TELEGRAM_BOT_TOKEN in .env and PostgreSQL (not the PGlite file).
-  bot:
-    profiles: ["bot"]
-    build:
-      context: .
-      target: bot
-    restart: unless-stopped
-    init: true
-    env_file:
-      - .env
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-uzbook}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-uzbook}"
-    depends_on:
-      db:
-        condition: service_healthy
-      app:
-        # Wait for the app to apply migrations before the bot starts.
-        condition: service_healthy
 
 volumes:
   pg_data:

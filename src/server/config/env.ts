@@ -55,7 +55,7 @@ export function validateProductionEnv(env: NodeJS.ProcessEnv = process.env): Env
 
   if (!value(env, "DATABASE_URL")) {
     warnings.push(
-      "DATABASE_URL is empty: the app will use PGlite. Use PostgreSQL for production, especially with the Telegram bot or more than one process.",
+      "DATABASE_URL is empty: the app will use PGlite. Use PostgreSQL for production or when running more than one process.",
     );
   }
 
@@ -96,15 +96,6 @@ export function validateProductionEnv(env: NodeJS.ProcessEnv = process.env): Env
   const cryptoFlag = value(env, "PAYMENTS_CRYPTO").toLowerCase();
   if (["on", "true", "1", "yes"].includes(cryptoFlag) && !value(env, "CRYPTO_DEPOSIT_ADDRESS")) {
     errors.push("PAYMENTS_CRYPTO is enabled, but CRYPTO_DEPOSIT_ADDRESS is not set.");
-  }
-
-  const botToken = value(env, "TELEGRAM_BOT_TOKEN");
-  const botUsername = value(env, "TELEGRAM_BOT_USERNAME");
-  if (botToken && !botUsername) {
-    warnings.push("TELEGRAM_BOT_USERNAME is empty: Telegram payment and linking links may not work.");
-  }
-  if (!botToken && botUsername) {
-    warnings.push("TELEGRAM_BOT_USERNAME is set without TELEGRAM_BOT_TOKEN.");
   }
 
   const paymentDetails = value(env, "PAYMENT_DETAILS");

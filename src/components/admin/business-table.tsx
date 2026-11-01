@@ -10,7 +10,6 @@ import {
   Pause,
   Play,
   Search,
-  Send,
   TimerReset,
 } from "lucide-react";
 import {
@@ -30,7 +29,6 @@ export type AdminBusinessItem = {
   createdAt: string;
   ownerName: string;
   ownerEmail: string;
-  telegramLinked: boolean;
   pendingPlan: PlanId | null;
 };
 
@@ -144,11 +142,6 @@ export function BusinessTable({
                   <div className="flex flex-wrap items-center gap-1.5">
                     <p className="truncate text-[13px] font-semibold">{row.name}</p>
                     <span className="text-[10.5px] text-muted">/{row.slug}</span>
-                    {row.telegramLinked && (
-                      <span title="Telegram подключён" className="text-[#229ed9]">
-                        <Send size={11} strokeWidth={2} />
-                      </span>
-                    )}
                     {row.pendingPlan && (
                       <span className="rounded-full bg-amber/10 px-1.5 py-0.5 text-[9px] font-semibold text-amber">
                         заявка · {planById(row.pendingPlan).name}

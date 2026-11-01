@@ -2,7 +2,7 @@ import { getDb } from "../src/server/db";
 import { sql } from "drizzle-orm";
 import { users, businesses, staff, services, payments, subscriptions, auditLogs } from "../src/server/db/schema";
 import { authSecret } from "../src/server/config/env";
-import { demoPaymentsEnabled, paymeConfig, clickConfig, telegramPaymentsEnabled } from "../src/server/payments/config";
+import { demoPaymentsEnabled, paymeConfig, clickConfig } from "../src/server/payments/config";
 
 async function run() {
   console.log("==========================================");
@@ -65,11 +65,9 @@ async function run() {
   }
   const payme = paymeConfig();
   const click = clickConfig();
-  const tg = telegramPaymentsEnabled();
 
   console.log(`   ✓ Payme enabled: ${payme.enabled}`);
   console.log(`   ✓ Click enabled: ${click.enabled}`);
-  console.log(`   ✓ Telegram Stars enabled: ${tg}`);
   console.log(`   ✓ Demo Payments enabled: ${isDemo}`);
 
   // Summary

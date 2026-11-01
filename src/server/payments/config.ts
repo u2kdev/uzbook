@@ -1,6 +1,6 @@
 import type { Plan } from "@/lib/plans";
 
-export type PaymentProviderId = "PAYME" | "CLICK" | "TELEGRAM_STARS" | "DEMO" | "MANUAL" | "CRYPTO";
+export type PaymentProviderId = "PAYME" | "CLICK" | "DEMO" | "MANUAL" | "CRYPTO";
 
 export type ProviderOption = {
   id: PaymentProviderId;
@@ -33,12 +33,6 @@ export function clickConfig() {
     secretKey,
     enabled: Boolean(serviceId && merchantId && secretKey),
   };
-}
-
-export function telegramPaymentsEnabled(): boolean {
-  return Boolean(
-    process.env.TELEGRAM_BOT_TOKEN?.trim() && process.env.TELEGRAM_BOT_USERNAME?.trim(),
-  );
 }
 
 /**
@@ -88,13 +82,6 @@ export function availableProviders(): ProviderOption[] {
       id: "CLICK",
       label: "Click",
       hint: "Оплата картой или через приложение Click",
-    });
-  }
-  if (telegramPaymentsEnabled()) {
-    providers.push({
-      id: "TELEGRAM_STARS",
-      label: "Telegram Stars",
-      hint: "Оплата звёздами внутри Telegram — без карты",
     });
   }
   if (cryptoPaymentsEnabled()) {
@@ -159,36 +146,4 @@ export function buildClickCheckoutUrl(plan: Plan, externalId: string): string | 
   url.searchParams.set("transaction_param", externalId);
   url.searchParams.set("return_url", `${appUrl()}/pay/${externalId}`);
   return url.toString();
-}
-
-export async function createTelegramInvoice(params: {
-  plan: Plan;
-  externalId: string;
-  businessName: string;
-}): Promise<string | null> {
-  const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  if (!token || !telegramPaymentsEnabled()) return null;
-
-  const response = await fetch(`https://api.telegram.org/bot${token}/createInvoiceLink`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      title: `Тариф «${params.plan.name}» — 30 дней`,
-      description: `${params.businessName}: страница записи, мастера, услуги и уведомления.`,
-      payload: params.externalId,
-      provider_token: "",
-      currency: "XTR",
-      prices: [{ label: `Тариф «${params.plan.name}», 30 дней`, amount: params.plan.starsPrice }],
-    }),
-  });
-
-  const data = (await response.json().catch(() => null)) as
-    | { ok?: boolean; result?: string; description?: string }
-    | null;
-
-  if (!data?.ok || !data.result) {
-    console.error("Telegram createInvoiceLink failed", data?.description);
-    return null;
-  }
-  return data.result;
 }

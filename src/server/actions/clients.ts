@@ -12,7 +12,6 @@ export type ClientSummary = {
   name: string;
   phone: string;
   email: string | null;
-  telegramId: string | null;
   notes: string | null;
   createdAt: string;
   totalBookings: number;
@@ -214,7 +213,6 @@ export async function getClientsAction(): Promise<{
       name: c.name,
       phone: c.phone,
       email: c.email,
-      telegramId: c.telegramId,
       notes: c.notes,
       createdAt: c.createdAt.toISOString(),
       totalBookings: clientBookings.length,
@@ -247,7 +245,6 @@ export async function getClientsAction(): Promise<{
         name: first.clientName,
         phone,
         email: first.clientEmail,
-        telegramId: null,
         notes: null,
         createdAt: first.startAt.toISOString(),
         totalBookings: list.length,
@@ -360,7 +357,6 @@ export async function getClientDetailedInfoAction(phone: string): Promise<Client
     name: clientName,
     phone,
     email: clientRecord?.email ?? null,
-    telegramId: clientRecord?.telegramId ?? null,
     notes: clientRecord?.notes ?? null,
     createdAt: (clientRecord?.createdAt ?? firstBooking?.startAt ?? now).toISOString(),
     totalBookings: bookingRows.length,

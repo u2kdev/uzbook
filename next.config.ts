@@ -18,8 +18,6 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
-      { protocol: "https", hostname: "t.me" },
-      { protocol: "https", hostname: "*.telegram.org" },
     ],
   },
   experimental: {
@@ -31,12 +29,12 @@ const nextConfig: NextConfig = {
   async headers() {
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://telegram.org https://unpkg.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com",
       "style-src 'self' 'unsafe-inline' https://unpkg.com",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://api.telegram.org",
-      "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org",
+      "connect-src 'self'",
+      "frame-ancestors 'self'",
       "form-action 'self' https://checkout.paycom.uz https://my.click.uz",
       "base-uri 'self'",
       "object-src 'none'",

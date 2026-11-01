@@ -14,7 +14,6 @@ export type AdminBusinessRow = {
   business: Business;
   ownerName: string;
   ownerEmail: string;
-  ownerTelegramId: string | null;
   pending: Subscription | null;
   active: Subscription | null;
 };
@@ -26,7 +25,6 @@ export async function getAdminBusinesses(): Promise<AdminBusinessRow[]> {
       business: businesses,
       ownerName: users.name,
       ownerEmail: users.email,
-      ownerTelegramId: users.telegramId,
     })
     .from(businesses)
     .innerJoin(users, eq(businesses.ownerId, users.id))

@@ -27,7 +27,6 @@ import {
   writeBlockedReason,
 } from "../src/server/limits";
 import { completePayment, createPayment } from "../src/server/payments/service";
-import { createTelegramLinkToken, readTelegramLinkToken } from "../src/server/telegram/link";
 import { generateQRCodeDataURL } from "../src/lib/qr-code";
 import { planById } from "../src/lib/plans";
 
@@ -335,21 +334,9 @@ async function run() {
   console.log(`  ✓ Успешно: заявка ${manualReq.id} подтверждена, тариф повышен до ${afterApprovalBiz.plan}\n`);
 
   // ------------------------------------------------------------------
-  // 9. Ссылка привязки Telegram работает
+  // 9. QR открывает публичную страницу
   // ------------------------------------------------------------------
-  console.log(`[Scenario 9] Ссылка привязки Telegram...`);
-  const linkToken = await createTelegramLinkToken(user.id);
-  const parsedLink = await readTelegramLinkToken(linkToken);
-
-  if (!parsedLink || parsedLink.userId !== user.id) {
-    throw new Error("Telegram link token verification failed");
-  }
-  console.log(`  ✓ Успешно: сгенерирован подписанный токен JWT, верификация подтвердила userId: ${parsedLink.userId}\n`);
-
-  // ------------------------------------------------------------------
-  // 10. QR открывает публичную страницу
-  // ------------------------------------------------------------------
-  console.log(`[Scenario 10] QR-код открывает публичную страницу...`);
+  console.log(`[Scenario 9] QR-код открывает публичную страницу...`);
   const publicPageUrl = `https://uzbook.online/${business.slug}`;
   const qrDataUrl = await generateQRCodeDataURL(publicPageUrl, 256, business.theme.accent);
 
@@ -359,7 +346,7 @@ async function run() {
   console.log(`  ✓ Успешно: сгенерирован валидный base64 QR-код для ссылки ${publicPageUrl}\n`);
 
   console.log(`======================================================`);
-  console.log(`  ALL 10 FULLSTACK SCENARIOS PASSED SUCCESSFULLY! 🚀`);
+  console.log(`  ALL 9 FULLSTACK SCENARIOS PASSED SUCCESSFULLY! 🚀`);
   console.log(`======================================================\n`);
 }
 

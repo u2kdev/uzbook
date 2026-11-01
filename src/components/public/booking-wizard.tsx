@@ -14,7 +14,6 @@ import {
   X,
 } from "lucide-react";
 import { formatMoney } from "@/lib/plans";
-import { useTelegramWebApp } from "@/components/telegram/telegram-webapp-provider";
 
 export type WizardService = {
   id: string;
@@ -110,14 +109,6 @@ export function BookingWizard({
   staff,
   initialStaffId,
 }: Props) {
-  const {
-    isAvailable: isTma,
-    user: tmaUser,
-    initData,
-    haptic,
-    close: closeTma,
-  } = useTelegramWebApp();
-
   const [staffId, setStaffId] = useState<string | null>(null);
   const [serviceId, setServiceId] = useState<string | null>(null);
   const [date, setDate] = useState(() => todayInZone(timezone));
@@ -131,14 +122,6 @@ export function BookingWizard({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [doneToken, setDoneToken] = useState<string | null>(null);
-
-  // Pre-fill user name from Telegram Mini App if available
-  useEffect(() => {
-    if (tmaUser && !name) {
-      const fullName = [tmaUser.first_name, tmaUser.last_name].filter(Boolean).join(" ");
-      if (fullName) setName(fullName);
-    }
-  }, [tmaUser, name]);
 
   const selectedStaff = staff.find((s) => s.id === staffId) ?? null;
   const selectedService = services.find((s) => s.id === serviceId) ?? null;
@@ -231,7 +214,6 @@ export function BookingWizard({
           phone: clientPhone.trim(),
           email: email.trim(),
           note: note.trim(),
-          initData: initData || undefined,
         }),
       });
       const data = (await response.json()) as {
@@ -240,7 +222,6 @@ export function BookingWizard({
         error?: string;
       };
       if (!response.ok || !data.ok || !data.manageToken) {
-        haptic.error();
         setError(
           data.error === "slot_unavailable"
             ? "Это время только что заняли. Выберите другое."
@@ -256,10 +237,8 @@ export function BookingWizard({
         }
         return;
       }
-      haptic.success();
       setDoneToken(data.manageToken);
     } catch {
-      haptic.error();
       setError("Нет связи с сервером. Проверьте интернет и попробуйте снова.");
     } finally {
       setSubmitting(false);
@@ -608,15 +587,9 @@ export function BookingWizard({
                 >
                   Управлять записью
                 </a>
-                {isTma ? (
-                  <button onClick={closeTma} className="btn btn-secondary w-full">
-                    Вернуться в Telegram
-                  </button>
-                ) : (
-                  <button onClick={onClose} className="btn btn-ghost w-full">
-                    Закрыть
-                  </button>
-                )}
+                <button onClick={onClose} className="btn btn-ghost w-full">
+                  Закрыть
+                </button>
               </div>
 
               {(phone || address) && (
@@ -634,7 +607,7 @@ export function BookingWizard({
                 </div>
               )}
               <p className="mt-4 text-[10.5px] text-muted">
-                Ссылка на управление записью придёт в Telegram, если салон подключил бота.
+                Сохраните эту страницу — по ссылке можно перенести или отменить запись.
               </p>
             </div>
           )}

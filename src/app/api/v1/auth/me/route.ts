@@ -22,7 +22,6 @@ export async function GET(request: Request) {
         name: user.name,
         role: user.role,
         phone: user.phone,
-        telegramId: user.telegramId,
       },
       business: {
         id: business.id,

@@ -38,8 +38,8 @@ const FEATURES = [
   },
   {
     icon: BellRing,
-    title: "Напоминания в Telegram",
-    text: "Клиент получает подтверждение и напоминание. Вы видите, кто записался, без звонков.",
+    title: "Запись 24/7",
+    text: "Клиент выбирает услугу и свободное время в любое время суток. Вы видите, кто записался, без звонков.",
   },
   {
     icon: UserRound,
@@ -89,7 +89,7 @@ export default function HomePage() {
             <div className="animate-rise">
               <span className="badge">
                 <span className="size-1.5 rounded-full bg-brand" />
-                Запись · Telegram · Без звонков
+                Запись · Онлайн · Без звонков
               </span>
 
               <h1 className="mt-6 text-[clamp(2.6rem,6.4vw,4.4rem)] leading-[0.98] font-semibold">
@@ -298,7 +298,7 @@ export default function HomePage() {
                   </span>
                   <h3 className="mt-6 text-xl font-semibold">Одна ссылка</h3>
                   <p className="mt-2 text-[14px] leading-relaxed text-muted">
-                    Ставите в Instagram, Telegram и на визитку.
+                    Ставите в Instagram, WhatsApp и на визитку.
                   </p>
                   <div className="mt-auto pt-6">
                     <div className="flex items-center gap-2 rounded-xl border border-line bg-paper px-3 py-2.5">
@@ -362,7 +362,7 @@ export default function HomePage() {
                 {
                   n: "03",
                   title: "Делитесь ссылкой",
-                  text: "Клиент выбирает мастера, услугу и свободное время. Вы получаете уведомление.",
+                  text: "Клиент выбирает мастера, услугу и свободное время. Запись сразу появляется в кабинете.",
                 },
               ].map((step, i) => (
                 <Reveal key={step.n} delay={i * 90}>
@@ -387,7 +387,7 @@ export default function HomePage() {
               Платите за команду, а не за каждую запись
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-muted">
-              На старте оплату подтверждает менеджер — карта, Telegram Stars, крипта или счёт.
+              На старте оплату подтверждает менеджер — карта, крипта или счёт.
               Позже подключим автоматические платежи.
             </p>
           </Reveal>

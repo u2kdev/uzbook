@@ -11,7 +11,6 @@ import {
   Landmark,
   Loader2,
   Send,
-  Star,
   X,
 } from "lucide-react";
 import {
@@ -21,7 +20,7 @@ import {
 import { startPaymentAction, type PaymentActionState } from "@/server/actions/payments";
 import { PLANS, formatMoney, type PlanId } from "@/lib/plans";
 
-type ProviderId = "PAYME" | "CLICK" | "TELEGRAM_STARS" | "DEMO" | "MANUAL" | "CRYPTO";
+type ProviderId = "PAYME" | "CLICK" | "DEMO" | "MANUAL" | "CRYPTO";
 
 type Provider = {
   id: ProviderId;
@@ -33,7 +32,6 @@ type Provider = {
 const PROVIDER_ICONS: Record<ProviderId, typeof CreditCard> = {
   PAYME: CreditCard,
   CLICK: CreditCard,
-  TELEGRAM_STARS: Star,
   DEMO: FlaskConical,
   MANUAL: Landmark,
   CRYPTO: Coins,

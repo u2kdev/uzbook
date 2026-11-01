@@ -7,7 +7,6 @@ import { businesses, payments, subscriptions, users } from "@/server/db/schema";
 import { requireAdmin } from "@/server/auth/session";
 import { planById, type PlanId } from "@/lib/plans";
 import { recordAuditLog } from "@/server/payments/service";
-import { notifyPaymentCompleted } from "@/server/telegram/notify";
 
 export type AdminState = { ok?: boolean; error?: string } | null;
 
@@ -284,15 +283,6 @@ export async function approveSubscriptionAction(subscriptionId: string): Promise
       plan: txResult.subscription.plan,
       provider: txResult.subscription.provider,
     },
-  });
-
-  void notifyPaymentCompleted({
-    businessId: txResult.subscription.businessId,
-    plan: txResult.plan.name,
-    amount: txResult.plan.priceUzs,
-    currency: "UZS",
-    provider: txResult.subscription.provider,
-    periodEnd: txResult.periodEnd,
   });
 
   refresh();

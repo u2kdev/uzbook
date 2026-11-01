@@ -1,11 +1,11 @@
 # uzbook
 
 Онлайн-запись для малого бизнеса: салоны красоты, барбершопы, стоматологии, мастера.
-Владелец получает мини-лендинг со ссылкой на запись, таймлайн дня и уведомления в Telegram.
+Владелец получает мини-лендинг со ссылкой на запись и таймлайн дня.
 Клиент записывается без регистрации и сам переносит или отменяет запись по ссылке.
 
 Альтернатива altg.io, заточенная под Узбекистан: русский интерфейс, UZS, локальное время,
-Telegram вместо push-уведомлений.
+веб-интерфейс и мобильное приложение.
 
 ## Что уже работает
 
@@ -21,8 +21,7 @@ Telegram вместо push-уведомлений.
   акцентный цвет, правила записи (шаг слотов, lead time, горизонт, автоподтверждение,
   показ цен, email);
 - тариф и оплата `/dashboard/billing`: текущий план, лимиты, заявка на тариф,
-  история подписок;
-- Telegram: привязка аккаунта и уведомления о новых записях, отменах и переносах.
+  история подписок.
 
 **Для клиента**
 
@@ -39,21 +38,12 @@ Telegram вместо push-уведомлений.
 - `/admin/users` — роли `OWNER` / `SUPPORT` / `ADMIN`;
 - роль `SUPPORT` видит данные, но не меняет тарифы и роли.
 
-**Telegram-бот** (`bot/index.ts`)
-
-- `/start link_<token>` — привязка аккаунта к Telegram;
-- `/today` — сводка записей на сегодня;
-- `/help`;
-- уведомления владельцу о новой записи, отмене и переносе с кнопками
-  «Открыть кабинет» и «Страница записи».
-
 ## Стек
 
 - Next.js 16 (App Router, Server Actions), React 19, TypeScript;
 - Tailwind CSS 4, lucide-react;
 - PostgreSQL + Drizzle ORM;
 - PGlite для локальной разработки без установки Postgres;
-- grammY (Telegram Bot API, long polling);
 - jose + bcryptjs (сессии и пароли).
 
 ## Быстрый старт
@@ -92,29 +82,6 @@ npm run admin:create
 MRR, бизнесы, пользователи и подтверждение оплат по тарифам. Владелец салона видит
 конструктор страницы в `/dashboard/profile` (основное, блоки, дизайн, галерея, QR-код).
 
-## Telegram-бот
-
-1. Создайте бота у [@BotFather](https://t.me/BotFather) и скопируйте токен.
-2. Заполните `.env`:
-
-```env
-TELEGRAM_BOT_TOKEN=123456:ABC...
-TELEGRAM_BOT_USERNAME=your_bot_name   # без @
-APP_URL=https://uzbook.online
-```
-
-3. Запустите бота отдельным процессом:
-
-```bash
-npm run bot
-```
-
-4. В кабинете откройте «Страница» → «Подключить Telegram».
-   Ссылка привязки живёт 7 дней (`AUTH_SECRET` подписывает токен).
-
-Уведомления отправляются, если у владельца заполнен `users.telegram_id`.
-Без токена приложение работает, просто не отправляет сообщения.
-
 ## Переменные окружения
 
 ```env
@@ -122,8 +89,8 @@ npm run bot
 DATABASE_URL=
 
 # ВНИМАНИЕ: PGlite работает в файловой системе и строго поддерживает только ОДИН процесс.
-# Нельзя подключать к одной директории PGlite несколько параллельных процессов (например, Next.js + бот или несколько реплик).
-# Для продакшена, бота и масштабирования обязательно используйте PostgreSQL через DATABASE_URL.
+# Нельзя подключать к одной директории PGlite несколько параллельных процессов (например, Next.js и maintenance или несколько реплик).
+# Для продакшена и масштабирования обязательно используйте PostgreSQL через DATABASE_URL.
 
 # Docker compose: PostgreSQL и порт на хосте
 POSTGRES_DB=uzbook
@@ -134,11 +101,8 @@ APP_PORT=3000
 # Обязательно поменять в production (мин. 32 символа)
 AUTH_SECRET=dev-only-secret-change-me-please-32chars-min
 
-# Публичный адрес: ссылки в боте, страница записи
+# Публичный адрес: страница записи и возврат после оплаты
 APP_URL=http://localhost:3000
-
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_BOT_USERNAME=
 
 # Тестовые платежи: включают тариф бесплатно. В production выключить!
 PAYMENTS_DEMO=off
@@ -180,8 +144,6 @@ ADMIN_NAME=Администратор
 - **Click** — `https://my.click.uz/services/pay`, webhook `POST /api/payments/click`
   (Prepare/Complete, MD5-подпись). Нужны `CLICK_SERVICE_ID`, `CLICK_MERCHANT_ID`,
   `CLICK_SECRET_KEY`.
-- **Telegram Stars** — счёт создаётся через Bot API (`createInvoiceLink`, XTR),
-  оплата подтверждается ботом (`successful_payment`). Нужен токен бота.
 - **Тестовый платёж** — работает при `PAYMENTS_DEMO=on`, включает тариф без денег.
   Перед production обязательно `PAYMENTS_DEMO=off`.
 - **Ручной перевод** — заявка `PENDING`, подтверждает админ в `/admin/requests`.
@@ -199,18 +161,16 @@ src/components/          UI: публичная страница, кабинет
 src/server/actions/      server actions: auth, каталог, записи, профиль, админ
 src/server/booking/      слоты, создание/перенос/отмена, время
 src/server/business/     выборки бизнеса, расписание дня, данные админки
-src/server/telegram/     Bot API, уведомления, токены привязки
 src/server/db/           Drizzle schema и подключение
-bot/index.ts             Telegram-бот (long polling)
 drizzle/                 SQL-миграции
-scripts/                 migrate, seed
-Dockerfile               standalone-образ + цель bot
+scripts/                 migrate, seed, maintenance
+Dockerfile               standalone-образ + цель maintenance
 docker-compose*.yml       PostgreSQL / PGlite, uploads volumes
 ```
 
 ## Модель данных (кратко)
 
-- `users` — владельцы, поддержка, админы; `telegram_id` для уведомлений;
+- `users` — владельцы, поддержка, админы;
 - `businesses` — один бизнес на владельца (MVP), slug = публичный адрес,
   `settings` (JSONB) и `theme` (JSONB);
 - `staff`, `services`, `staff_services` — команда и каталог;
@@ -233,7 +193,7 @@ cp .env.example .env
 #   AUTH_SECRET=$(openssl rand -base64 32)
 #   POSTGRES_PASSWORD=<сильный пароль>
 #   PAYMENTS_DEMO=off
-#   PAYME_* / CLICK_* / TELEGRAM_* — реальные ключи
+#   PAYME_* / CLICK_* / CRYPTO_* — реальные ключи
 
 docker compose up -d --build
 docker compose ps
@@ -250,7 +210,7 @@ docker compose run --rm --no-deps maintenance \
 - `app` — Next.js standalone в непривилегированном контейнере, миграции
   применяются при старте (`RUN_MIGRATIONS_ON_START=true`);
 - `maintenance` — раз в час закрывает истёкшие подписки и отменяет брошенные
-  платежи старше 24 часов (тот же образ, что у бота, поэтому есть `tsx`);
+  платежи старше 24 часов (отдельный образ с `tsx`);
 - загруженные картинки — в volume `uploads` (`/app/.data/uploads`);
 - healthcheck — `GET /api/health` (проверяет и БД).
 
@@ -268,8 +228,8 @@ docker compose run --rm --no-deps maintenance \
 пример с лимитом тела 12 МБ, редиректом на HTTPS и rate limit для webhook:
 [`deploy/nginx.conf`](./deploy/nginx.conf).
 
-`APP_URL` должен совпадать с публичным HTTPS-адресом: от него зависят QR-коды,
-ссылки в Telegram и возврат после оплаты.
+`APP_URL` должен совпадать с публичным HTTPS-адресом: от него зависят QR-коды
+и возврат после оплаты.
 
 CI (`.github/workflows/ci.yml`) запускает `typecheck`, `build` и
 `npm audit --omit=dev` на каждый push в `main` и pull request.
@@ -277,19 +237,6 @@ CI (`.github/workflows/ci.yml`) запускает `typecheck`, `build` и
 Сборка образа требует интернет: `npm ci` скачивает зависимости, а
 `next/font/google` — шрифты. Если у сервера нет выхода наружу, соберите образ
 на CI и перенесите его через registry.
-
-### Telegram-бот в Docker
-
-Бот запускается отдельным контейнером только вместе с PostgreSQL:
-
-```bash
-docker compose --profile bot up -d --build bot
-docker compose logs -f bot
-```
-
-Профиль `bot` не стартует вместе с `docker compose up`, пока не указан явно.
-Если `TELEGRAM_BOT_TOKEN` пустой, контейнер завершится — тогда просто не
-включайте профиль.
 
 ### Docker + PGlite (маленький сервер)
 
@@ -300,19 +247,14 @@ docker compose -f docker-compose.pglite.yml up -d --build
 ```
 
 PGlite и загрузки лежат в volume `app_data`. Это один процесс и одна реплика:
-нельзя запускать второй контейнер приложения на том же volume. Бот с PGlite
-отдельным процессом (в контейнере или на хосте) не работает — для Telegram
-нужен PostgreSQL-вариант.
+нельзя запускать второй контейнер приложения на том же volume. Для отдельных
+worker-контейнеров нужен PostgreSQL-вариант.
 
 ### Обновление и бэкапы
 
 ```bash
 # обновление + healthcheck
 ./deploy/deploy.sh
-
-# если подключён бот
-docker compose --profile bot build --pull
-docker compose --profile bot up -d
 
 # PostgreSQL + uploads в ./backups/<timestamp>
 ./deploy/backup.sh
@@ -333,14 +275,14 @@ docker run --rm -v uzbook_app_data:/data -v "$PWD":/backup alpine \
 1. Поднимите PostgreSQL и задайте `DATABASE_URL`.
 2. `npm ci && npm run db:migrate && npm run build`.
 3. `npm start` под systemd/pm2.
-4. Бота — отдельным процессом `npm run bot`.
+4. `npm run maintenance` — по cron раз в час (или отдельным worker-процессом).
 
 Перед production: выключите `PAYMENTS_DEMO`, смените `AUTH_SECRET` и пароль
 PostgreSQL, уберите демо-пользователей и демо-данные. Cookie сессии в
 production уходит только по `secure`, поэтому HTTPS обязателен.
 
 Локальная PGlite подходит для разработки и одного небольшого инстанса: один
-процесс, нет репликации. Для нескольких реплик и бота нужен обычный Postgres.
+процесс, нет репликации. Для нескольких реплик нужен обычный Postgres.
 
 ### Тестирование и валидация
 
@@ -356,19 +298,16 @@ npx tsx scripts/test-fullstack-scenarios.ts
 # 3. Лимиты тарифов и история подписок
 npx tsx scripts/test-billing-feature.ts
 
-# 4. Telegram Webhook, Bot & Mini App
-npx tsx scripts/test-telegram-production.ts
-
-# 5. Платежи beta (Payme, Click, Crypto USDT, возвраты, TTL)
+# 4. Платежи beta (Payme, Click, Crypto USDT, возвраты, TTL)
 npx tsx scripts/test-payments-lifecycle.ts
 
-# 6. REST API v1 (JWT Access/Refresh, слоты, бронирования, кабинет владельца)
+# 5. REST API v1 (JWT Access/Refresh, слоты, бронирования, кабинет владельца)
 npx tsx scripts/test-api-v1.ts
 
-# 7. Мобильное приложение (хранилище токенов, Deep Links, клиент)
+# 6. Мобильное приложение (хранилище токенов, Deep Links, клиент)
 npx tsx scripts/test-mobile-app.ts
 
-# 8. Предрелизный аудит (Release Gates)
+# 7. Предрелизный аудит (Release Gates)
 npx tsx scripts/release-check.ts
 ```
 

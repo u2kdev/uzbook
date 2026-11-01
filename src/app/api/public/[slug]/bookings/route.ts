@@ -4,7 +4,6 @@ import { getBusinessBySlug } from "@/server/business/public";
 import { createBooking, normalizePhone } from "@/server/booking/service";
 import { getSession } from "@/server/auth/session";
 import { clientIp, rateLimit } from "@/server/http/rate-limit";
-import { validateTelegramInitData } from "@/server/telegram/webapp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +16,6 @@ const bodySchema = z.object({
   phone: z.string().min(7).max(30),
   email: z.string().max(120).optional().or(z.literal("")),
   note: z.string().max(500).optional().or(z.literal("")),
-  initData: z.string().optional(),
 });
 
 export async function POST(
@@ -63,21 +61,7 @@ export async function POST(
   }
 
   const session = await getSession();
-
-  let source: "WEB" | "TELEGRAM" | "MANUAL" = session ? "MANUAL" : "WEB";
-  let telegramId: string | null = null;
-
-  if (parsed.data.initData) {
-    const validated = validateTelegramInitData(parsed.data.initData);
-    if (!validated.valid || !validated.user) {
-      return NextResponse.json(
-        { error: "invalid_telegram_init_data" },
-        { status: 401 },
-      );
-    }
-    source = "TELEGRAM";
-    telegramId = String(validated.user.id);
-  }
+  const source: "WEB" | "MANUAL" = session ? "MANUAL" : "WEB";
 
   const result = await createBooking({
     business,
@@ -89,7 +73,6 @@ export async function POST(
     email: parsed.data.email || null,
     note: parsed.data.note || null,
     source,
-    telegramId,
   });
 
   if (!result.ok) {

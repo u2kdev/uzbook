@@ -131,7 +131,7 @@ export function QRCodeDisplay({
     <p class="sub">Наведите камеру телефона на QR-код</p>
     <div class="qr"><img src="${data}" alt="QR-код" /></div>
     <p class="action">Выберите услугу и время</p>
-    <p class="hint">Без звонков и переписки. Запись занимает меньше минуты,<br/>а напоминание придёт автоматически.</p>
+    <p class="hint">Без звонков и переписки. Запись занимает меньше минуты,<br/>а управлять ей можно по ссылке.</p>
     <p class="link">${url.replace(/[<>&"]/g, "")}</p>
   </div>
   <script>window.addEventListener("load", function () { setTimeout(function () { window.print(); }, 300); });</script>

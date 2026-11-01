@@ -9,7 +9,6 @@ import {
   checkApiRateLimit,
   handleApiError,
 } from "@/server/api/v1/response";
-import { notifyBookingCancelled } from "@/server/telegram/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,10 +62,6 @@ export async function PATCH(
         updatedAt: now,
       })
       .where(eq(bookings.id, booking.id));
-
-    if (status === "CANCELLED") {
-      void notifyBookingCancelled(booking.id);
-    }
 
     return apiSuccess({
       id: booking.id,
