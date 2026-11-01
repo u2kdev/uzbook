@@ -6,6 +6,7 @@ import {
   payments,
   subscriptions,
   auditLogs,
+  users,
   type Business,
   type Payment,
 } from "@/server/db/schema";
@@ -53,6 +54,13 @@ export async function createPayment(params: {
   }
 
   const plan = planById(params.plan);
+  const effectiveAmountUzs =
+    business.customPriceUzs !== null &&
+    business.customPriceUzs !== undefined &&
+    business.customPriceUzs > 0
+      ? business.customPriceUzs
+      : plan.priceUzs;
+
   const externalId = randomUUID();
   const db = await getDb();
 
@@ -60,12 +68,12 @@ export async function createPayment(params: {
   let payload: Record<string, unknown> = {};
 
   if (provider === "PAYME") {
-    const checkoutUrl = buildPaymeCheckoutUrl(plan, externalId);
+    const checkoutUrl = buildPaymeCheckoutUrl(plan, externalId, effectiveAmountUzs);
     if (!checkoutUrl) throw new Error("Payme не настроен");
     url = checkoutUrl;
     payload = { checkoutUrl };
   } else if (provider === "CLICK") {
-    const checkoutUrl = buildClickCheckoutUrl(plan, externalId);
+    const checkoutUrl = buildClickCheckoutUrl(plan, externalId, effectiveAmountUzs);
     if (!checkoutUrl) throw new Error("Click не настроен");
     url = checkoutUrl;
     payload = { checkoutUrl };
@@ -75,7 +83,7 @@ export async function createPayment(params: {
     if (!conf.address) {
       throw new Error("Криптокошелёк не настроен (укажите CRYPTO_DEPOSIT_ADDRESS)");
     }
-    const cryptoAmount = Number((plan.priceUzs / conf.rateUzs).toFixed(2));
+    const cryptoAmount = Number((effectiveAmountUzs / conf.rateUzs).toFixed(2));
     url = `/pay/${externalId}`;
     payload = {
       asset: conf.asset,
@@ -110,7 +118,7 @@ export async function createPayment(params: {
         plan: params.plan,
         provider,
         status: "CREATED",
-        amount: plan.priceUzs,
+        amount: effectiveAmountUzs,
         currency: "UZS",
         externalId,
         payload,
@@ -219,6 +227,16 @@ export async function completePayment(params: {
       .orderBy(sql`${subscriptions.currentPeriodEnd} desc nulls last`)
       .limit(1);
 
+    const [pendingSub] = await tx
+      .select()
+      .from(subscriptions)
+      .where(
+        and(eq(subscriptions.businessId, business.id), eq(subscriptions.status, "PENDING")),
+      )
+      .orderBy(sql`${subscriptions.createdAt} desc`)
+      .limit(1)
+      .for("update");
+
     const plan = planById(payment.plan);
     const now = new Date();
     const base =
@@ -245,24 +263,46 @@ export async function completePayment(params: {
       return { ok: false as const, error: "Платёж отменён или возвращён" };
     }
 
+    const paidAmount =
+      payment.amount && payment.amount > 0
+        ? payment.amount
+        : business.customPriceUzs !== null &&
+            business.customPriceUzs !== undefined &&
+            business.customPriceUzs > 0
+          ? business.customPriceUzs
+          : plan.priceUzs;
+
+    const assignedProviderId = business.providerId ?? pendingSub?.providerId ?? null;
+    let providerCommissionPercent: number | null = null;
+    let providerPayoutAmount: number | null = null;
+
+    if (assignedProviderId) {
+      const [provUser] = await tx
+        .select({ commissionPercent: users.commissionPercent })
+        .from(users)
+        .where(eq(users.id, assignedProviderId))
+        .limit(1);
+      providerCommissionPercent =
+        provUser?.commissionPercent ?? pendingSub?.providerCommissionPercent ?? 60;
+      providerPayoutAmount = Math.round((paidAmount * providerCommissionPercent) / 100);
+    }
+
+    const effectiveStaffLimit =
+      business.customStaffLimit ?? pendingSub?.customStaffLimit ?? null;
+    const effectiveClientLimit =
+      business.customClientLimit ?? pendingSub?.customClientLimit ?? null;
+
     await tx
       .update(payments)
       .set({
         status: "PAID",
+        amount: paidAmount,
         providerTxnId: params.providerTxnId ?? payment.providerTxnId,
         payload: { ...(payment.payload ?? {}), ...(params.payload ?? {}) },
         paidAt: now,
         updatedAt: now,
       })
       .where(eq(payments.id, payment.id));
-
-    // A manual request is no longer relevant once an online payment succeeded.
-    await tx
-      .update(subscriptions)
-      .set({ status: "CANCELLED" })
-      .where(
-        and(eq(subscriptions.businessId, business.id), eq(subscriptions.status, "PENDING")),
-      );
 
     // Keep one ACTIVE subscription per business; the new period already
     // includes the remaining days of the previous one.
@@ -273,17 +313,57 @@ export async function completePayment(params: {
         and(eq(subscriptions.businessId, business.id), eq(subscriptions.status, "ACTIVE")),
       );
 
-    await tx.insert(subscriptions).values({
-      businessId: business.id,
-      plan: payment.plan,
-      status: "ACTIVE",
-      provider: payment.provider,
-      amount: plan.priceUzs,
-      currency: payment.currency,
-      startedAt: now,
-      currentPeriodEnd: periodEnd,
-      note: `Онлайн-оплата · ${payment.provider}`,
-    });
+    if (pendingSub) {
+      // Cancel any other older PENDING rows if present
+      await tx
+        .update(subscriptions)
+        .set({ status: "CANCELLED" })
+        .where(
+          and(
+            eq(subscriptions.businessId, business.id),
+            eq(subscriptions.status, "PENDING"),
+            ne(subscriptions.id, pendingSub.id),
+          ),
+        );
+
+      await tx
+        .update(subscriptions)
+        .set({
+          plan: payment.plan,
+          status: "ACTIVE",
+          provider: payment.provider,
+          providerId: assignedProviderId,
+          amount: paidAmount,
+          currency: payment.currency,
+          customStaffLimit: effectiveStaffLimit,
+          customClientLimit: effectiveClientLimit,
+          providerCommissionPercent,
+          providerPayoutAmount,
+          startedAt: now,
+          currentPeriodEnd: periodEnd,
+          note: pendingSub.note
+            ? `${pendingSub.note} · Оплачено онлайн (${payment.provider})`
+            : `Онлайн-оплата · ${payment.provider}`,
+        })
+        .where(eq(subscriptions.id, pendingSub.id));
+    } else {
+      await tx.insert(subscriptions).values({
+        businessId: business.id,
+        providerId: assignedProviderId,
+        plan: payment.plan,
+        status: "ACTIVE",
+        provider: payment.provider,
+        amount: paidAmount,
+        currency: payment.currency,
+        customStaffLimit: effectiveStaffLimit,
+        customClientLimit: effectiveClientLimit,
+        providerCommissionPercent,
+        providerPayoutAmount,
+        startedAt: now,
+        currentPeriodEnd: periodEnd,
+        note: `Онлайн-оплата · ${payment.provider}`,
+      });
+    }
 
     await tx
       .update(businesses)
@@ -296,7 +376,10 @@ export async function completePayment(params: {
       businessId: business.id,
       plan: payment.plan,
       provider: payment.provider,
-      amount: plan.priceUzs,
+      amount: paidAmount,
+      providerId: assignedProviderId,
+      providerCommissionPercent,
+      providerPayoutAmount,
       periodEnd: periodEnd.toISOString(),
     });
 

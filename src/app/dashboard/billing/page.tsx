@@ -33,6 +33,16 @@ export default async function BillingPage() {
     .limit(10);
 
   const current = planById(business.plan);
+  const effectiveStaffLimit =
+    business.customStaffLimit !== null && business.customStaffLimit !== undefined
+      ? business.customStaffLimit
+      : current.staffLimit;
+  const effectivePriceUzs =
+    business.customPriceUzs !== null &&
+    business.customPriceUzs !== undefined &&
+    business.customPriceUzs > 0
+      ? business.customPriceUzs
+      : current.priceUzs;
   const pending = history.find((row) => row.status === "PENDING") ?? null;
   const providers = availableProviders();
   const usage = await getUsage(business);
@@ -81,16 +91,19 @@ export default async function BillingPage() {
                 : "Пробный период"
               : paidUntil
                 ? `Оплачен до ${paidUntil}`
-                : `${formatMoney(current.priceUzs, business.currency)} / мес`}
+                : `${formatMoney(effectivePriceUzs, business.currency)} / мес`}
           </p>
         </div>
 
         {[
           {
             label: "Мастера",
-            value: `${usage.staff} из ${current.staffLimit}`,
-            pct: percent(usage.staff, current.staffLimit),
-            hint: "лимит тарифа",
+            value: `${usage.staff} из ${effectiveStaffLimit}`,
+            pct: percent(usage.staff, effectiveStaffLimit),
+            hint:
+              business.customStaffLimit !== null && business.customStaffLimit !== undefined
+                ? "индивидуальный лимит"
+                : "лимит тарифа",
           },
           {
             label: "Услуги",
@@ -186,6 +199,9 @@ export default async function BillingPage() {
         pendingId={pending?.id ?? null}
         currency={business.currency}
         providers={providers}
+        customPriceUzs={business.customPriceUzs}
+        customStaffLimit={business.customStaffLimit}
+        customClientLimit={business.customClientLimit}
       />
 
       <div className="rounded-[24px] bg-white p-5 ring-1 ring-line/80">

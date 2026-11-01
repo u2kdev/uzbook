@@ -12,7 +12,9 @@ export type GalleryState = { ok?: boolean; error?: string; images?: GalleryImage
 
 async function currentBusiness() {
   const session = await requireUser();
-  if (session.role !== "OWNER") throw new Error("Только владелец может менять галерею");
+  if (session.role !== "OWNER" && session.role !== "ADMIN") {
+    throw new Error("Только владелец может менять галерею");
+  }
   const db = await getDb();
   const [business] = await db
     .select()

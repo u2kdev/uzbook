@@ -60,6 +60,7 @@ export function ProviderDashboard({
     email: string;
     username: string | null;
     phone: string | null;
+    role?: string;
     commissionPercent: number;
     payoutCard: string | null;
   };
@@ -118,7 +119,7 @@ export function ProviderDashboard({
                 Никнейм: <b>{provider.username || provider.email}</b>
               </p>
             </div>
-            {provider.username === "admin" && (
+            {provider.role === "ADMIN" && (
               <Link href="/admin" className="btn btn-ghost h-9 px-3 text-[12px]">
                 В Админку
               </Link>

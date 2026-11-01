@@ -43,12 +43,18 @@ export function BillingPlans({
   pendingId,
   currency,
   providers,
+  customPriceUzs,
+  customStaffLimit,
+  customClientLimit,
 }: {
   currentPlan: PlanId;
   pendingPlan: PlanId | null;
   pendingId: string | null;
   currency: string;
   providers: Provider[];
+  customPriceUzs?: number | null;
+  customStaffLimit?: number | null;
+  customClientLimit?: number | null;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<PlanId | null>(null);
@@ -57,6 +63,14 @@ export function BillingPlans({
   const [notice, setNotice] = useState<string | null>(null);
   const [cancelling, startCancel] = useTransition();
   const [pending, startTransition] = useTransition();
+
+  const hasCustomPrice =
+    customPriceUzs !== null && customPriceUzs !== undefined && customPriceUzs > 0;
+
+  function effectivePrice(plan: (typeof PLANS)[number]): number {
+    if (plan.id === "TRIAL") return 0;
+    return hasCustomPrice ? customPriceUzs! : plan.priceUzs;
+  }
 
   const selectedPlan = selected ? PLANS.find((plan) => plan.id === selected) ?? null : null;
 
@@ -117,10 +131,32 @@ export function BillingPlans({
         </div>
       )}
 
+      {(hasCustomPrice || customStaffLimit || customClientLimit) && (
+        <div className="rounded-2xl border border-brand/25 bg-brand-soft/40 px-4 py-3 text-[12px] leading-relaxed text-ink-soft">
+          <span className="font-semibold text-ink">Индивидуальные условия провайдера:</span>{" "}
+          {hasCustomPrice && (
+            <span>
+              специальная стоимость подписки <b>{formatMoney(customPriceUzs!, currency)} / мес</b>
+            </span>
+          )}
+          {customStaffLimit ? (
+            <span>
+              {hasCustomPrice ? " · " : ""}до <b>{customStaffLimit}</b> мастеров
+            </span>
+          ) : null}
+          {customClientLimit ? (
+            <span>
+              {hasCustomPrice || customStaffLimit ? " · " : ""}до <b>{customClientLimit}</b> клиентов
+            </span>
+          ) : null}
+        </div>
+      )}
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {PLANS.map((plan) => {
           const isCurrent = plan.id === currentPlan;
           const isPending = plan.id === pendingPlan;
+          const planPrice = effectivePrice(plan);
 
           return (
             <div
@@ -162,7 +198,7 @@ export function BillingPlans({
 
                 <div className="mt-4 flex items-end gap-1.5">
                   <span className="text-[24px] leading-none font-semibold tracking-tight">
-                    {plan.priceUzs === 0 ? "0" : formatMoney(plan.priceUzs, currency)}
+                    {planPrice === 0 ? "0" : formatMoney(planPrice, currency)}
                   </span>
                   <span
                     className={`pb-0.5 text-[11px] ${
@@ -255,7 +291,7 @@ export function BillingPlans({
                   Оплата тарифа
                 </p>
                 <h3 className="mt-1 text-[19px] font-semibold tracking-[-0.02em]">
-                  {selectedPlan.name} · {formatMoney(selectedPlan.priceUzs, currency)}
+                  {selectedPlan.name} · {formatMoney(effectivePrice(selectedPlan), currency)}
                 </h3>
                 <p className="mt-0.5 text-[11.5px] text-muted">Доступ на 30 дней</p>
               </div>

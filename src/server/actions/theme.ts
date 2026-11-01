@@ -54,7 +54,9 @@ const themeSchema = z.object({
 
 async function ownerBusiness() {
   const session = await requireUser();
-  if (session.role !== "OWNER") throw new Error("Только владелец может менять оформление");
+  if (session.role !== "OWNER" && session.role !== "ADMIN") {
+    throw new Error("Только владелец может менять оформление");
+  }
   const db = await getDb();
   const [business] = await db
     .select()

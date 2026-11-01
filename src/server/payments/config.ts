@@ -120,14 +120,23 @@ export function providerLabel(provider: string): string {
 }
 
 /** Payme checkout expects the amount in tiyin (1 UZS = 100 tiyin). */
-export function buildPaymeCheckoutUrl(plan: Plan, externalId: string): string | null {
+export function buildPaymeCheckoutUrl(
+  plan: Plan,
+  externalId: string,
+  customAmountUzs?: number | null,
+): string | null {
   const { merchantId, enabled } = paymeConfig();
   if (!enabled) return null;
+
+  const amountUzs =
+    customAmountUzs !== null && customAmountUzs !== undefined && customAmountUzs > 0
+      ? customAmountUzs
+      : plan.priceUzs;
 
   const params = [
     `m=${merchantId}`,
     `ac.order_id=${externalId}`,
-    `a=${plan.priceUzs * 100}`,
+    `a=${amountUzs * 100}`,
     `c=${appUrl()}/pay/${externalId}`,
     "l=ru",
   ].join(";");
@@ -135,14 +144,23 @@ export function buildPaymeCheckoutUrl(plan: Plan, externalId: string): string | 
   return `https://checkout.paycom.uz/${Buffer.from(params).toString("base64")}`;
 }
 
-export function buildClickCheckoutUrl(plan: Plan, externalId: string): string | null {
+export function buildClickCheckoutUrl(
+  plan: Plan,
+  externalId: string,
+  customAmountUzs?: number | null,
+): string | null {
   const { serviceId, merchantId, enabled } = clickConfig();
   if (!enabled) return null;
+
+  const amountUzs =
+    customAmountUzs !== null && customAmountUzs !== undefined && customAmountUzs > 0
+      ? customAmountUzs
+      : plan.priceUzs;
 
   const url = new URL("https://my.click.uz/services/pay");
   url.searchParams.set("service_id", serviceId);
   url.searchParams.set("merchant_id", merchantId);
-  url.searchParams.set("amount", String(plan.priceUzs));
+  url.searchParams.set("amount", String(amountUzs));
   url.searchParams.set("transaction_param", externalId);
   url.searchParams.set("return_url", `${appUrl()}/pay/${externalId}`);
   return url.toString();

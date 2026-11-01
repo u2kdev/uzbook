@@ -31,7 +31,7 @@ export async function blockTimeAction(input: {
   reason: string;
 }): Promise<QuickActionResult> {
   const session = await requireUser();
-  if (session.role !== "OWNER") return { ok: false, error: "Нет доступа" };
+  if (session.role !== "OWNER" && session.role !== "ADMIN") return { ok: false, error: "Нет доступа" };
 
   const db = await getDb();
   const [business] = await db
@@ -113,7 +113,7 @@ export async function toggleDayOffAction(input: {
   isClosed: boolean;
 }): Promise<QuickActionResult> {
   const session = await requireUser();
-  if (session.role !== "OWNER") return { ok: false, error: "Нет доступа" };
+  if (session.role !== "OWNER" && session.role !== "ADMIN") return { ok: false, error: "Нет доступа" };
 
   const db = await getDb();
   const [business] = await db

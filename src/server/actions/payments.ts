@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, ne } from "drizzle-orm";
 import { getDb } from "@/server/db";
-import { businesses, payments, subscriptions } from "@/server/db/schema";
+import { businesses, payments, subscriptions, users } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { planById, type PlanId } from "@/lib/plans";
 import {
@@ -28,7 +28,9 @@ export type PaymentActionState = {
 
 async function ownerBusiness() {
   const session = await requireUser();
-  if (session.role !== "OWNER") throw new Error("Только владелец может оплачивать тариф");
+  if (session.role !== "OWNER" && session.role !== "ADMIN") {
+    throw new Error("Только владелец может оплачивать тариф");
+  }
   const db = await getDb();
   const [business] = await db
     .select()
@@ -176,6 +178,27 @@ export async function confirmCryptoPaymentAction(
   }
 
   const plan = planById(row.payment.plan);
+  const effectiveAmount =
+    row.payment.amount && row.payment.amount > 0
+      ? row.payment.amount
+      : business.customPriceUzs !== null &&
+          business.customPriceUzs !== undefined &&
+          business.customPriceUzs > 0
+        ? business.customPriceUzs
+        : plan.priceUzs;
+
+  let providerCommissionPercent: number | null = null;
+  let providerPayoutAmount: number | null = null;
+  if (business.providerId) {
+    const [prov] = await db
+      .select({ commissionPercent: users.commissionPercent })
+      .from(users)
+      .where(eq(users.id, business.providerId))
+      .limit(1);
+    providerCommissionPercent = prov?.commissionPercent ?? 60;
+    providerPayoutAmount = Math.round((effectiveAmount * providerCommissionPercent) / 100);
+  }
+
   await db.transaction(async (tx) => {
     await tx
       .update(subscriptions)
@@ -186,11 +209,16 @@ export async function confirmCryptoPaymentAction(
 
     await tx.insert(subscriptions).values({
       businessId: business.id,
+      providerId: business.providerId ?? null,
       plan: row.payment.plan,
       status: "PENDING",
       provider: "CRYPTO",
-      amount: plan.priceUzs,
+      amount: effectiveAmount,
       currency: row.payment.currency,
+      customStaffLimit: business.customStaffLimit ?? null,
+      customClientLimit: business.customClientLimit ?? null,
+      providerCommissionPercent,
+      providerPayoutAmount,
       note: `Крипто-оплата · Заказ ${row.payment.externalId.slice(0, 8)} · TXID: ${cleanHash}`,
       currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });

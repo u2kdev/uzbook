@@ -17,6 +17,7 @@ import {
 import { rateLimit } from "@/server/http/rate-limit";
 import { TRIAL_MS } from "@/lib/plans";
 import { isValidSlug, slugify } from "@/lib/slug";
+import { normalizeAuthPhone } from "@/lib/phone";
 import { logger } from "@/server/logger";
 import { recordAuditLog } from "@/server/payments/service";
 
@@ -39,18 +40,6 @@ async function actionClientIp(): Promise<string> {
     if (last) return last;
   }
   return "unknown";
-}
-
-export function normalizeAuthPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.length === 9) {
-    return `+998${digits}`;
-  }
-  if (digits.length >= 7) {
-    return `+${digits}`;
-  }
-  return "";
 }
 
 const loginCredentials = z.object({

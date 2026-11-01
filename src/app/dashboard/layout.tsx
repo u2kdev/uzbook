@@ -11,7 +11,8 @@ export const metadata: Metadata = { title: "Кабинет" };
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await requireUser();
-  if (session.role !== "OWNER") redirect("/admin");
+  if (session.role === "PROVIDER") redirect("/provider");
+  if (session.role === "SUPPORT") redirect("/admin");
 
   const db = await getDb();
   const [business] = await db
@@ -20,7 +21,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .where(eq(businesses.ownerId, session.id))
     .limit(1);
 
-  if (!business) redirect("/onboarding");
+  if (!business) {
+    if (session.role === "ADMIN") redirect("/admin");
+    redirect("/onboarding");
+  }
 
   const currentBusiness = await expireBusinessIfNeeded(business);
 

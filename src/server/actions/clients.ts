@@ -59,7 +59,7 @@ export async function getClientsAction(): Promise<{
   currency: string;
 }> {
   const session = await requireUser();
-  if (session.role !== "OWNER") {
+  if (session.role !== "OWNER" && session.role !== "ADMIN") {
     return {
       clients: [],
       stats: { totalClients: 0, vipClients: 0, totalRevenue: 0, avgLtv: 0 },
@@ -289,7 +289,7 @@ export async function getClientsAction(): Promise<{
 
 export async function getClientDetailedInfoAction(phone: string): Promise<ClientDetailedInfo | null> {
   const session = await requireUser();
-  if (session.role !== "OWNER") return null;
+  if (session.role !== "OWNER" && session.role !== "ADMIN") return null;
 
   const db = await getDb();
   const [business] = await db
@@ -378,7 +378,7 @@ export async function getClientDetailedInfoAction(phone: string): Promise<Client
 
 export async function updateClientNotesAction(phone: string, notes: string): Promise<{ ok: boolean; error?: string }> {
   const session = await requireUser();
-  if (session.role !== "OWNER") return { ok: false, error: "Нет доступа" };
+  if (session.role !== "OWNER" && session.role !== "ADMIN") return { ok: false, error: "Нет доступа" };
 
   const db = await getDb();
   const [business] = await db
@@ -416,7 +416,7 @@ export async function updateClientNotesAction(phone: string, notes: string): Pro
 
 export async function saveClientAction(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   const session = await requireUser();
-  if (session.role !== "OWNER") return { ok: false, error: "Нет доступа" };
+  if (session.role !== "OWNER" && session.role !== "ADMIN") return { ok: false, error: "Нет доступа" };
 
   const db = await getDb();
   const [business] = await db

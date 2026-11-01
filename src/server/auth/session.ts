@@ -70,13 +70,17 @@ export async function requireUser(): Promise<SessionUser> {
 
 export async function requireAdmin(): Promise<SessionUser> {
   const session = await requireUser();
-  if (session.role !== "ADMIN" && session.role !== "SUPPORT") redirect("/dashboard");
+  if (session.role !== "ADMIN" && session.role !== "SUPPORT") {
+    redirect(session.role === "PROVIDER" ? "/provider" : "/dashboard");
+  }
   return session;
 }
 
 export async function requireProvider(): Promise<SessionUser> {
   const session = await requireUser();
-  if (session.role !== "PROVIDER" && session.role !== "ADMIN") redirect("/dashboard");
+  if (session.role !== "PROVIDER" && session.role !== "ADMIN") {
+    redirect(session.role === "SUPPORT" ? "/admin" : "/dashboard");
+  }
   return session;
 }
 

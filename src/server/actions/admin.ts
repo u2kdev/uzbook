@@ -230,14 +230,46 @@ export async function approveSubscriptionAction(subscriptionId: string): Promise
         ),
       );
 
+    const [business] = await tx
+      .select()
+      .from(businesses)
+      .where(eq(businesses.id, subscription.businessId))
+      .limit(1);
+
     const effectiveAmount =
-      subscription.amount && subscription.amount > 0 ? subscription.amount : plan.priceUzs;
+      subscription.amount && subscription.amount > 0
+        ? subscription.amount
+        : business?.customPriceUzs !== null &&
+            business?.customPriceUzs !== undefined &&
+            business.customPriceUzs > 0
+          ? business.customPriceUzs
+          : plan.priceUzs;
+
+    const assignedProviderId = subscription.providerId ?? business?.providerId ?? null;
+    let providerCommissionPercent = subscription.providerCommissionPercent;
+    let providerPayoutAmount = subscription.providerPayoutAmount;
+
+    if (assignedProviderId) {
+      const [provUser] = await tx
+        .select({ commissionPercent: users.commissionPercent })
+        .from(users)
+        .where(eq(users.id, assignedProviderId))
+        .limit(1);
+      providerCommissionPercent =
+        provUser?.commissionPercent ?? subscription.providerCommissionPercent ?? 60;
+      providerPayoutAmount = Math.round((effectiveAmount * providerCommissionPercent) / 100);
+    }
 
     await tx
       .update(subscriptions)
       .set({
         status: "ACTIVE",
+        providerId: assignedProviderId,
         amount: effectiveAmount,
+        customStaffLimit: subscription.customStaffLimit ?? business?.customStaffLimit ?? null,
+        customClientLimit: subscription.customClientLimit ?? business?.customClientLimit ?? null,
+        providerCommissionPercent,
+        providerPayoutAmount,
         startedAt: now,
         currentPeriodEnd: periodEnd,
         note: subscription.note ? `${subscription.note} (подтверждено)` : "Подтверждено администратором",

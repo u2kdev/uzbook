@@ -23,6 +23,7 @@ export default async function ProviderPage() {
         email: data.provider.email,
         username: data.provider.username ?? null,
         phone: data.provider.phone ?? null,
+        role: session.role,
         commissionPercent: data.provider.commissionPercent ?? 60,
         payoutCard: data.provider.payoutCard ?? null,
       }}

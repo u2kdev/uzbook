@@ -153,7 +153,11 @@ export async function POST(request: Request) {
     if (!row) return fail(id, ERRORS.order);
     if (row.payment.status === "PAID") return fail(id, ERRORS.state);
 
-    const expected = planById(row.payment.plan).priceUzs * 100;
+    const expectedUzs =
+      row.payment.amount && row.payment.amount > 0
+        ? row.payment.amount
+        : planById(row.payment.plan).priceUzs;
+    const expected = expectedUzs * 100;
     if (Number(params.amount) !== expected) return fail(id, ERRORS.amount);
     return answer(id, { allow: true });
   }
@@ -180,7 +184,11 @@ export async function POST(request: Request) {
       return fail(id, ERRORS.state);
     }
 
-    const expected = planById(row.payment.plan).priceUzs * 100;
+    const expectedUzs =
+      row.payment.amount && row.payment.amount > 0
+        ? row.payment.amount
+        : planById(row.payment.plan).priceUzs;
+    const expected = expectedUzs * 100;
     if (Number(params.amount) !== expected) return fail(id, ERRORS.amount);
 
     const createTime = Number(params.time) || Date.now();

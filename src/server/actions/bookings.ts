@@ -16,7 +16,7 @@ export async function setBookingStatus(
   reason?: string,
 ): Promise<StatusActionResult> {
   const session = await requireUser();
-  if (session.role !== "OWNER") return { ok: false, error: "Нет доступа" };
+  if (session.role !== "OWNER" && session.role !== "ADMIN") return { ok: false, error: "Нет доступа" };
 
   const db = await getDb();
   const [business] = await db
@@ -79,7 +79,7 @@ export async function createManualBookingAction(
   formData: FormData,
 ): Promise<ManualBookingState> {
   const session = await requireUser();
-  if (session.role !== "OWNER") return { error: "Нет доступа" };
+  if (session.role !== "OWNER" && session.role !== "ADMIN") return { error: "Нет доступа" };
 
   const db = await getDb();
   const [business] = await db
@@ -145,7 +145,7 @@ export async function ownerRescheduleBookingAction(input: {
   staffId?: string;
 }): Promise<RescheduleActionResult> {
   const session = await requireUser();
-  if (session.role !== "OWNER") return { ok: false, error: "Нет доступа" };
+  if (session.role !== "OWNER" && session.role !== "ADMIN") return { ok: false, error: "Нет доступа" };
 
   const db = await getDb();
   const [business] = await db
@@ -245,7 +245,7 @@ export type ClientHistory = {
 
 export async function getClientHistoryAction(phone: string): Promise<ClientHistory> {
   const session = await requireUser();
-  if (session.role !== "OWNER") {
+  if (session.role !== "OWNER" && session.role !== "ADMIN") {
     return { totalVisits: 0, completedVisits: 0, cancelledVisits: 0, noShowVisits: 0, totalSpent: 0, lastVisitAt: null };
   }
 
