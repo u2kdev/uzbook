@@ -328,7 +328,7 @@ export async function createBusinessAction(
     .where(eq(users.id, session.id))
     .limit(1);
 
-  await db.transaction(async (tx) => {
+  const createdBusiness = await db.transaction(async (tx) => {
     const [business] = await tx
       .insert(businesses)
       .values({
@@ -353,13 +353,19 @@ export async function createBusinessAction(
       note: "Автоматически выданный пробный период",
     });
 
-    await recordAuditLog({
-      userId: session.id,
-      action: "business.created",
-      entityType: "business",
-      entityId: business.id,
-      details: { name: business.name, slug: business.slug, category: business.category },
-    });
+    return business;
+  });
+
+  await recordAuditLog({
+    userId: session.id,
+    action: "business.created",
+    entityType: "business",
+    entityId: createdBusiness.id,
+    details: {
+      name: createdBusiness.name,
+      slug: createdBusiness.slug,
+      category: createdBusiness.category,
+    },
   });
 
   redirect("/dashboard");

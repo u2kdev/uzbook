@@ -453,9 +453,10 @@ export async function recordAuditLog(params: {
   entityType: string;
   entityId: string;
   details?: Record<string, unknown>;
+  executor?: { insert: Awaited<ReturnType<typeof getDb>>["insert"] };
 }): Promise<void> {
-  const db = await getDb();
-  await db.insert(auditLogs).values({
+  const target = params.executor ?? (await getDb());
+  await target.insert(auditLogs).values({
     userId: params.userId ?? null,
     action: params.action,
     entityType: params.entityType,
