@@ -43,6 +43,11 @@ export async function POST(
         slot_unavailable: { code: "slot_unavailable", message: "Выбранное время уже занято", status: 409 },
         service_not_found: { code: "service_not_found", message: "Услуга не найдена", status: 404 },
         business_not_found: { code: "business_not_found", message: "Салон не найден", status: 404 },
+        cancellation_deadline_passed: {
+          code: "cancellation_deadline_passed",
+          message: "Срок переноса записи истёк по правилам салона",
+          status: 400,
+        },
       };
 
       const mapped = errorMap[result.error] ?? {

@@ -28,6 +28,8 @@ export type BookingFailure =
   | "client_limit_reached"
   | "booking_not_found"
   | "booking_cancelled"
+  | "email_required"
+  | "cancellation_deadline_passed"
   | "invalid_input";
 
 const MAX_ACTIVE_BOOKINGS_PER_PHONE = 5;
@@ -87,6 +89,10 @@ export async function createBooking(input: {
 
   const phone = normalizePhone(input.phone);
   if (!input.name.trim() || phone.length < 7) return { ok: false, error: "invalid_input" };
+
+  if (input.business.settings?.requireEmail && !input.email?.trim()) {
+    return { ok: false, error: "email_required" };
+  }
 
   const date = dateInZone(start, input.business.timezone);
   const slots = await getAvailableSlots({
@@ -355,6 +361,20 @@ export async function cancelBooking(
     return { ok: false, error: "booking_cancelled" };
   }
 
+  const [business] = await db
+    .select({ settings: businesses.settings })
+    .from(businesses)
+    .where(eq(businesses.id, booking.businessId))
+    .limit(1);
+
+  const cancellationHours = business?.settings?.cancellationHours ?? 0;
+  if (
+    cancellationHours > 0 &&
+    booking.startAt.getTime() - Date.now() < cancellationHours * 3600_000
+  ) {
+    return { ok: false, error: "cancellation_deadline_passed" };
+  }
+
   await db
     .update(bookings)
     .set({
@@ -402,6 +422,14 @@ export async function rescheduleBooking(
     .where(eq(businesses.id, booking.businessId))
     .limit(1);
   if (!business || business.status === "SUSPENDED") return { ok: false, error: "business_not_found" };
+
+  const cancellationHours = business.settings?.cancellationHours ?? 0;
+  if (
+    cancellationHours > 0 &&
+    booking.startAt.getTime() - Date.now() < cancellationHours * 3600_000
+  ) {
+    return { ok: false, error: "cancellation_deadline_passed" };
+  }
 
   const start = new Date(newStartAt);
   if (Number.isNaN(start.getTime())) return { ok: false, error: "invalid_input" };

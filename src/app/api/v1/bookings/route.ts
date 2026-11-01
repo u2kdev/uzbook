@@ -86,6 +86,11 @@ export async function POST(request: Request) {
           message: "Достигнут лимит базы клиентов данного салона",
           status: 403,
         },
+        email_required: {
+          code: "email_required",
+          message: "Салон требует обязательного указания email",
+          status: 422,
+        },
         invalid_input: { code: "invalid_input", message: "Неверная дата или параметры", status: 422 },
       };
 

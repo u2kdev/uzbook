@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/server/db";
 import { bookings, businesses, clients, services, staff } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
-import { createBooking } from "@/server/booking/service";
+import { createBooking, normalizePhone } from "@/server/booking/service";
 import { clientLimitError, currentBusinessForOwner, writeBlockedReason } from "@/server/limits";
 
 export type ClientSummary = {
@@ -387,12 +387,13 @@ export async function updateClientNotesAction(phone: string, notes: string): Pro
   const blocked = writeBlockedReason(business);
   if (blocked) return { ok: false, error: blocked };
 
+  const normalizedPhone = normalizePhone(phone);
   const db = await getDb();
 
   const existing = await db
     .select({ id: clients.id })
     .from(clients)
-    .where(and(eq(clients.businessId, business.id), eq(clients.phone, phone)))
+    .where(and(eq(clients.businessId, business.id), eq(clients.phone, normalizedPhone)))
     .limit(1);
 
   if (existing.length > 0) {
@@ -401,11 +402,14 @@ export async function updateClientNotesAction(phone: string, notes: string): Pro
       .set({ notes: notes.trim() || null })
       .where(eq(clients.id, existing[0].id));
   } else {
+    const limitErr = await clientLimitError(business, normalizedPhone);
+    if (limitErr) return { ok: false, error: limitErr };
+
     // If client wasn't in clients table yet, create row with notes
     await db.insert(clients).values({
       businessId: business.id,
       name: "Клиент",
-      phone,
+      phone: normalizedPhone,
       notes: notes.trim() || null,
     });
   }
@@ -427,7 +431,8 @@ export async function saveClientAction(formData: FormData): Promise<{ ok: boolea
   const db = await getDb();
 
   const name = String(formData.get("name") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim();
+  const rawPhone = String(formData.get("phone") ?? "").trim();
+  const phone = normalizePhone(rawPhone);
   const email = String(formData.get("email") ?? "").trim() || null;
   const notes = String(formData.get("notes") ?? "").trim() || null;
 
@@ -457,6 +462,14 @@ export async function saveClientAction(formData: FormData): Promise<{ ok: boolea
 
   revalidatePath("/dashboard/clients");
   return { ok: true };
+}
+
+function escapeCsvCell(val: string | null | undefined): string {
+  let s = (val ?? "").replace(/"/g, '""');
+  if (/^[=+\-@\t\r]/.test(s)) {
+    s = "'" + s;
+  }
+  return `"${s}"`;
 }
 
 export async function exportClientsCsvAction(): Promise<{ ok: boolean; csv?: string; filename?: string; error?: string }> {
@@ -494,19 +507,19 @@ export async function exportClientsCsvAction(): Promise<{ ok: boolean; csv?: str
         : "Новый";
 
     return [
-      `"${c.name.replace(/"/g, '""')}"`,
-      `"${c.phone}"`,
-      `"${(c.email ?? "").replace(/"/g, '""')}"`,
+      escapeCsvCell(c.name),
+      escapeCsvCell(c.phone),
+      escapeCsvCell(c.email),
       `"${segmentLabel}"`,
       c.completedVisits,
       c.cancelledVisits,
       c.noShowVisits,
       c.totalSpent,
       c.avgBill,
-      `"${c.lastVisitAt ? c.lastVisitAt.slice(0, 10) : "-"}"`,
-      `"${(c.favoriteServiceName ?? "-").replace(/"/g, '""')}"`,
-      `"${(c.favoriteStaffName ?? "-").replace(/"/g, '""')}"`,
-      `"${(c.notes ?? "").replace(/"/g, '""')}"`,
+      escapeCsvCell(c.lastVisitAt ? c.lastVisitAt.slice(0, 10) : "-"),
+      escapeCsvCell(c.favoriteServiceName ?? "-"),
+      escapeCsvCell(c.favoriteStaffName ?? "-"),
+      escapeCsvCell(c.notes ?? ""),
     ].join(",");
   });
 

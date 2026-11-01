@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   date,
@@ -140,7 +140,7 @@ export const users = pgTable(
   (t) => [
     uniqueIndex("users_email_uq").on(t.email),
     uniqueIndex("users_username_uq").on(t.username),
-    index("users_phone_idx").on(t.phone),
+    uniqueIndex("users_phone_uq").on(t.phone).where(sql`${t.phone} is not null`),
   ],
 );
 

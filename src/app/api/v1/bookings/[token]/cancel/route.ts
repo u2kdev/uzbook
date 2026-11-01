@@ -43,6 +43,9 @@ export async function POST(
       if (result.error === "booking_cancelled") {
         return apiError("already_cancelled", "Запись уже была отменена ранее", 400);
       }
+      if (result.error === "cancellation_deadline_passed") {
+        return apiError("cancellation_deadline_passed", "Срок бесплатной отмены записи истёк по правилам салона", 400);
+      }
       return apiError("cancel_failed", "Не удалось отменить запись", 400);
     }
 

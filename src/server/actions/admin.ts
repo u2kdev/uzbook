@@ -119,6 +119,20 @@ export async function setBusinessPlanAction(
           ? existing.customPriceUzs
           : planObj.priceUzs;
 
+    let providerCommissionPercent: number | null = null;
+    let providerPayoutAmount: number | null = null;
+
+    if (existing.providerId && plan !== "TRIAL") {
+      const [provUser] = await tx
+        .select({ commissionPercent: users.commissionPercent })
+        .from(users)
+        .where(eq(users.id, existing.providerId))
+        .limit(1);
+      const commission = provUser?.commissionPercent ?? 60;
+      providerCommissionPercent = commission;
+      providerPayoutAmount = Math.round((effectiveAmount * commission) / 100);
+    }
+
     await tx.insert(subscriptions).values({
       businessId,
       providerId: existing.providerId ?? null,
@@ -126,6 +140,8 @@ export async function setBusinessPlanAction(
       status: plan === "TRIAL" ? "TRIAL" : "ACTIVE",
       provider: "MANUAL",
       amount: effectiveAmount,
+      providerCommissionPercent,
+      providerPayoutAmount,
       customStaffLimit: existing.customStaffLimit ?? null,
       customClientLimit: existing.customClientLimit ?? null,
       startedAt: now,

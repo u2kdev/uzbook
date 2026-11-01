@@ -310,11 +310,17 @@ export async function getAdminProviders(): Promise<ProviderSummaryRow[]> {
       (s) => s.providerId === prov.id || connectedIds.has(s.businessId),
     );
 
-    const activeSubs = provSubs.filter((s) => s.status === "ACTIVE");
-    const pendingSubs = provSubs.filter((s) => s.status === "PENDING");
+    const paidSubs = provSubs.filter(
+      (s) =>
+        s.amount > 0 &&
+        (s.status === "ACTIVE" ||
+          s.status === "PAST_DUE" ||
+          (s.status === "CANCELLED" && (!s.note || !s.note.includes("Возврат")))),
+    );
+    const pendingSubs = provSubs.filter((s) => s.status === "PENDING" && s.amount > 0);
 
-    const totalPlatformRevenue = activeSubs.reduce((sum, s) => sum + s.amount, 0);
-    const totalProviderPayout = activeSubs.reduce(
+    const totalPlatformRevenue = paidSubs.reduce((sum, s) => sum + s.amount, 0);
+    const totalProviderPayout = paidSubs.reduce(
       (sum, s) =>
         sum +
         (s.providerPayoutAmount ??
@@ -433,13 +439,18 @@ export async function getProviderDashboardData(providerId: string) {
   let totalEarnedCard = 0;
   let expectedFromPending = 0;
 
-  for (const r of rows) {
-    const sub = r.latestSubscription;
-    if (sub?.status === "ACTIVE" && sub.amount > 0) {
+  for (const sub of allSubs) {
+    const isPaid =
+      sub.amount > 0 &&
+      (sub.status === "ACTIVE" ||
+        sub.status === "PAST_DUE" ||
+        (sub.status === "CANCELLED" && (!sub.note || !sub.note.includes("Возврат"))));
+
+    if (isPaid) {
       totalGrossPaid += sub.amount;
       totalEarnedCard +=
         sub.providerPayoutAmount ?? Math.round((sub.amount * commissionPercent) / 100);
-    } else if (sub?.status === "PENDING" && sub.amount > 0) {
+    } else if (sub.status === "PENDING" && sub.amount > 0) {
       expectedFromPending +=
         sub.providerPayoutAmount ?? Math.round((sub.amount * commissionPercent) / 100);
     }
