@@ -1,9 +1,10 @@
-import { eq } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/server/db";
 import { businesses, users } from "@/server/db/schema";
 import { verifyPassword } from "@/server/auth/session";
 import { createAuthTokens } from "@/server/api/v1/auth";
+import { normalizeAuthPhone } from "@/lib/phone";
 import {
   apiError,
   apiSuccess,
@@ -14,8 +15,11 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const DUMMY_PASSWORD_HASH = "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
 const loginSchema = z.object({
-  email: z.string().trim().email("Неверный формат email").toLowerCase(),
+  email: z.string().trim().min(2, "Введите телефон, email или никнейм").max(120).optional(),
+  login: z.string().trim().min(2, "Введите телефон, email или никнейм").max(120).optional(),
   password: z.string().min(1, "Пароль не может быть пустым"),
 });
 
@@ -35,17 +39,39 @@ export async function POST(request: Request) {
       );
     }
 
-    const { email, password } = parsed.data;
+    const rawLogin = (parsed.data.login ?? parsed.data.email ?? "").trim().toLowerCase();
+    const { password } = parsed.data;
+    if (!rawLogin) {
+      return apiError("validation_error", "Введите телефон, email или никнейм", 422);
+    }
+
+    const normalizedPhone = normalizeAuthPhone(rawLogin);
+    const phoneDigits = normalizedPhone.replace(/\D/g, "");
+
     const db = await getDb();
-    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(
+        phoneDigits.length >= 7
+          ? or(
+              eq(users.email, rawLogin),
+              eq(users.username, rawLogin),
+              eq(users.phone, normalizedPhone),
+              sql`regexp_replace(coalesce(${users.phone}, ''), '[^0-9]', '', 'g') = ${phoneDigits}`,
+            )
+          : or(eq(users.email, rawLogin), eq(users.username, rawLogin)),
+      )
+      .limit(1);
 
     if (!user) {
-      return apiError("invalid_credentials", "Неверный email или пароль", 401);
+      await verifyPassword(password, DUMMY_PASSWORD_HASH);
+      return apiError("invalid_credentials", "Неверный логин или пароль", 401);
     }
 
     const passwordOk = await verifyPassword(password, user.passwordHash);
     if (!passwordOk) {
-      return apiError("invalid_credentials", "Неверный email или пароль", 401);
+      return apiError("invalid_credentials", "Неверный логин или пароль", 401);
     }
 
     const [business] = await db

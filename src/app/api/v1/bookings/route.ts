@@ -80,6 +80,11 @@ export async function POST(request: Request) {
           message: "Превышен лимит активных предстоящих записей на этот номер телефона",
           status: 429,
         },
+        client_limit_reached: {
+          code: "client_limit_reached",
+          message: "Достигнут лимит базы клиентов данного салона",
+          status: 403,
+        },
         invalid_input: { code: "invalid_input", message: "Неверная дата или параметры", status: 422 },
       };
 

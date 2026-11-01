@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { getDb } from "@/server/db";
-import { businesses, galleryImages, pageSections, staff } from "@/server/db/schema";
+import { businesses, galleryImages, pageSections, staff, trustedLogos } from "@/server/db/schema";
 import { uploadPath } from "@/server/storage";
 
 const UPLOAD_DIR = path.resolve(process.cwd(), ".data", "uploads");
@@ -17,11 +17,12 @@ export async function findReferencedUploadNames(): Promise<Set<string>> {
     }
   };
 
-  const [bizRows, staffRows, galleryRows, sectionRows] = await Promise.all([
+  const [bizRows, staffRows, galleryRows, sectionRows, logoRows] = await Promise.all([
     db.select({ logoUrl: businesses.logoUrl, coverUrl: businesses.coverUrl }).from(businesses),
     db.select({ photoUrl: staff.photoUrl }).from(staff),
     db.select({ url: galleryImages.url, beforeUrl: galleryImages.beforeUrl }).from(galleryImages),
     db.select({ config: pageSections.config }).from(pageSections),
+    db.select({ imageUrl: trustedLogos.imageUrl }).from(trustedLogos),
   ]);
 
   for (const b of bizRows) {
@@ -34,6 +35,9 @@ export async function findReferencedUploadNames(): Promise<Set<string>> {
   for (const g of galleryRows) {
     extractName(g.url);
     extractName(g.beforeUrl);
+  }
+  for (const l of logoRows) {
+    extractName(l.imageUrl);
   }
   for (const sec of sectionRows) {
     if (sec.config) {

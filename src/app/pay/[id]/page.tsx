@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Clock3, XCircle } from "lucide-react";
 import { planById, formatMoney } from "@/lib/plans";
+import { requireUser } from "@/server/auth/session";
 import {
   demoPaymentsEnabled,
   providerLabel,
@@ -35,11 +36,19 @@ export default async function PaymentPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await requireUser();
   const { id } = await params;
   const row = await getPaymentByExternalId(id);
   if (!row) notFound();
 
   const { payment, business } = row;
+  const canView =
+    business.ownerId === session.id ||
+    session.role === "ADMIN" ||
+    session.role === "SUPPORT" ||
+    (session.role === "PROVIDER" && business.providerId === session.id);
+
+  if (!canView) notFound();
   const plan = planById(payment.plan);
   const subscription = payment.status === "PAID" ? await getActiveSubscription(business.id) : null;
   const payload = (payment.payload ?? {}) as Record<string, unknown>;

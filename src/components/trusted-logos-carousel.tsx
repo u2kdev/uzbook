@@ -55,12 +55,15 @@ export function TrustedLogosCarousel({ logos }: { logos: TrustedLogo[] }) {
                 </div>
               );
 
-              return item.linkUrl ? (
+              const isSafeLink =
+                typeof item.linkUrl === "string" && /^https?:\/\/.+/i.test(item.linkUrl);
+
+              return isSafeLink ? (
                 <a
                   key={`${item.id}-${idx}`}
-                  href={item.linkUrl}
+                  href={item.linkUrl!}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                 >
                   {content}
                 </a>

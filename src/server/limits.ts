@@ -2,6 +2,7 @@ import { and, count, desc, eq } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import {
   businesses,
+  clients,
   galleryImages,
   services,
   staff,
@@ -112,6 +113,36 @@ export async function staffLimitError(business: Business): Promise<string | null
   const usage = await getUsage(business);
   if (usage.staff >= effectiveStaffLimit) {
     return `На вашем тарифе доступно мастеров: ${effectiveStaffLimit}. Лимит исчерпан — смените тариф в разделе «Оплата».`;
+  }
+  return null;
+}
+
+export async function clientLimitError(
+  business: Business,
+  candidatePhone?: string,
+): Promise<string | null> {
+  if (business.customClientLimit === null || business.customClientLimit === undefined) {
+    return null;
+  }
+
+  const db = await getDb();
+  if (candidatePhone) {
+    const [existing] = await db
+      .select({ id: clients.id })
+      .from(clients)
+      .where(and(eq(clients.businessId, business.id), eq(clients.phone, candidatePhone)))
+      .limit(1);
+    if (existing) return null;
+  }
+
+  const [countRow] = await db
+    .select({ value: count() })
+    .from(clients)
+    .where(eq(clients.businessId, business.id));
+
+  const currentClients = Number(countRow?.value ?? 0);
+  if (currentClients >= business.customClientLimit) {
+    return `На вашем тарифе доступно клиентов: ${business.customClientLimit}. Лимит исчерпан — обратитесь к провайдеру или обновите тариф в разделе «Оплата».`;
   }
   return null;
 }

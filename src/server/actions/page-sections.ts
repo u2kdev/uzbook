@@ -16,6 +16,139 @@ export type SectionState = {
   sections?: typeof pageSections.$inferSelect[];
 } | null;
 
+const MAX_CONFIG_JSON_BYTES = 64 * 1024;
+
+const heroConfigSchema = z
+  .object({
+    showNearestSlot: z.boolean().optional(),
+    showPhoneButton: z.boolean().optional(),
+    ctaText: z.string().max(120).optional(),
+    badgeText: z.string().max(120).optional(),
+    align: z.enum(["left", "center"]).optional(),
+  })
+  .passthrough();
+
+const servicesConfigSchema = z
+  .object({
+    title: z.string().max(120).optional(),
+    subtitle: z.string().max(160).optional(),
+    groupByCategory: z.boolean().optional(),
+    showPrices: z.boolean().optional(),
+    showDuration: z.boolean().optional(),
+  })
+  .passthrough();
+
+const staffConfigSchema = z
+  .object({
+    title: z.string().max(120).optional(),
+    subtitle: z.string().max(160).optional(),
+    showBio: z.boolean().optional(),
+    showNextSlots: z.boolean().optional(),
+    columns: z.coerce.number().int().min(1).max(4).optional(),
+  })
+  .passthrough();
+
+const contactsConfigSchema = z
+  .object({
+    title: z.string().max(120).optional(),
+    showAddress: z.boolean().optional(),
+    showPhone: z.boolean().optional(),
+    showInstagram: z.boolean().optional(),
+    showWebsite: z.boolean().optional(),
+  })
+  .passthrough();
+
+const galleryConfigSchema = z
+  .object({
+    title: z.string().max(120).optional(),
+    subtitle: z.string().max(160).optional(),
+    items: z.array(z.record(z.string(), z.unknown())).max(100).optional(),
+  })
+  .passthrough();
+
+const promotionsConfigSchema = z
+  .object({
+    title: z.string().max(120).optional(),
+    subtitle: z.string().max(160).optional(),
+    items: z
+      .array(
+        z
+          .object({
+            title: z.string().max(200).optional().default(""),
+            serviceCategory: z.string().max(120).optional().default(""),
+            validUntil: z.string().max(40).optional().default(""),
+            description: z.string().max(1000).optional().default(""),
+          })
+          .passthrough(),
+      )
+      .max(50)
+      .optional(),
+  })
+  .passthrough();
+
+const reviewsConfigSchema = z
+  .object({
+    title: z.string().max(120).optional(),
+    subtitle: z.string().max(160).optional(),
+    items: z
+      .array(
+        z
+          .object({
+            name: z.string().max(120).optional().default(""),
+            rating: z.coerce.number().int().min(1).max(5).optional().default(5),
+            date: z.string().max(40).optional().default(""),
+            text: z.string().max(1500).optional().default(""),
+          })
+          .passthrough(),
+      )
+      .max(100)
+      .optional(),
+  })
+  .passthrough();
+
+const faqConfigSchema = z
+  .object({
+    title: z.string().max(120).optional(),
+    subtitle: z.string().max(160).optional(),
+    items: z
+      .array(
+        z
+          .object({
+            question: z.string().max(300).optional().default(""),
+            answer: z.string().max(2000).optional().default(""),
+          })
+          .passthrough(),
+      )
+      .max(100)
+      .optional(),
+  })
+  .passthrough();
+
+const vacanciesConfigSchema = z
+  .object({
+    title: z.string().max(120).optional(),
+    subtitle: z.string().max(160).optional(),
+    items: z
+      .array(
+        z
+          .object({
+            title: z.string().max(200).optional().default(""),
+            requirements: z.string().max(600).optional().default(""),
+            description: z.string().max(1500).optional().default(""),
+          })
+          .passthrough(),
+      )
+      .max(50)
+      .optional(),
+  })
+  .passthrough();
+
+const customHtmlConfigSchema = z
+  .object({
+    html: z.string().max(30000).optional().default(""),
+  })
+  .passthrough();
+
 const sectionConfigSchema = z.object({
   type: z.enum([
     "hero",
@@ -34,22 +167,57 @@ const sectionConfigSchema = z.object({
   config: z.record(z.string(), z.unknown()).default({}),
 });
 
+function validateAndSanitizeSectionConfig(
+  type: z.infer<typeof sectionConfigSchema>["type"],
+  config: Record<string, unknown>,
+): { ok: true; config: Record<string, unknown> } | { ok: false; error: string } {
+  const schemaByType: Record<z.infer<typeof sectionConfigSchema>["type"], z.ZodTypeAny> = {
+    hero: heroConfigSchema,
+    services: servicesConfigSchema,
+    staff: staffConfigSchema,
+    contacts: contactsConfigSchema,
+    gallery: galleryConfigSchema,
+    promotions: promotionsConfigSchema,
+    reviews: reviewsConfigSchema,
+    faq: faqConfigSchema,
+    vacancies: vacanciesConfigSchema,
+    custom_html: customHtmlConfigSchema,
+  };
+
+  const parsed = schemaByType[type].safeParse(config);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message || "Некорректные параметры настроек секции",
+    };
+  }
+
+  const data = parsed.data as Record<string, unknown>;
+  if (type === "custom_html") {
+    return {
+      ok: true,
+      config: {
+        ...data,
+        html: sanitizeHtml(data.html),
+      },
+    };
+  }
+  return { ok: true, config: data };
+}
+
 function sanitizeSectionConfig(
   type: z.infer<typeof sectionConfigSchema>["type"],
   config: Record<string, unknown>,
 ): Record<string, unknown> {
-  if (type === "custom_html") {
-    return {
-      ...config,
-      html: sanitizeHtml(config.html),
-    };
-  }
-  return config;
+  const res = validateAndSanitizeSectionConfig(type, config);
+  return res.ok ? res.config : config;
 }
 
 function parseConfigJson(raw: FormDataEntryValue | null): Record<string, unknown> | null {
   try {
-    const parsed = JSON.parse(String(raw ?? "{}"));
+    const str = String(raw ?? "{}");
+    if (Buffer.byteLength(str, "utf8") > MAX_CONFIG_JSON_BYTES) return null;
+    const parsed = JSON.parse(str);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
     return parsed as Record<string, unknown>;
   } catch {
@@ -107,7 +275,11 @@ export async function createSectionAction(
     return { error: parsed.error.issues[0].message };
   }
 
-  const safeConfig = sanitizeSectionConfig(parsed.data.type, parsed.data.config);
+  const validated = validateAndSanitizeSectionConfig(parsed.data.type, parsed.data.config);
+  if (!validated.ok) {
+    return { error: validated.error };
+  }
+  const safeConfig = validated.config;
 
   const [section] = await db
     .insert(pageSections)
@@ -153,7 +325,11 @@ export async function updateSectionAction(
     return { error: parsed.error.issues[0].message };
   }
 
-  const safeConfig = sanitizeSectionConfig(parsed.data.type, parsed.data.config);
+  const validated = validateAndSanitizeSectionConfig(parsed.data.type, parsed.data.config);
+  if (!validated.ok) {
+    return { error: validated.error };
+  }
+  const safeConfig = validated.config;
 
   await db
     .update(pageSections)

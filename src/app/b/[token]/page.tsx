@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getBookingByToken } from "@/server/booking/service";
+import { rateLimit } from "@/server/http/rate-limit";
 import { ManageBooking } from "@/components/public/manage-booking";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +13,21 @@ export default async function ManageBookingPage({
 }: {
   params: Promise<{ token: string }>;
 }) {
+  const h = await headers();
+  const ip =
+    h.get("x-real-ip")?.trim() ||
+    h
+      .get("x-forwarded-for")
+      ?.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .pop() ||
+    "unknown";
+
+  if (!rateLimit(`pub_booking_page:${ip}`, 40, 60_000).ok) {
+    notFound();
+  }
+
   const { token } = await params;
   const booking = await getBookingByToken(token);
   if (!booking) notFound();

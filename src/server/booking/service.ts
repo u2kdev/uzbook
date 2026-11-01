@@ -24,6 +24,7 @@ export type BookingFailure =
   | "staff_does_not_provide_service"
   | "slot_unavailable"
   | "too_many_active_bookings"
+  | "client_limit_reached"
   | "booking_not_found"
   | "booking_cancelled"
   | "invalid_input";
@@ -146,6 +147,27 @@ export async function createBooking(input: {
         }
       }
 
+      if (
+        input.business.customClientLimit !== null &&
+        input.business.customClientLimit !== undefined
+      ) {
+        const [existingClient] = await tx
+          .select({ id: clients.id })
+          .from(clients)
+          .where(and(eq(clients.businessId, input.business.id), eq(clients.phone, phone)))
+          .limit(1);
+
+        if (!existingClient) {
+          const [clientCountRow] = await tx
+            .select({ count: sql<number>`count(*)::int` })
+            .from(clients)
+            .where(eq(clients.businessId, input.business.id));
+          if (Number(clientCountRow?.count ?? 0) >= input.business.customClientLimit) {
+            return { kind: "client_limit" as const };
+          }
+        }
+      }
+
       const [client] = await tx
         .insert(clients)
         .values({
@@ -188,6 +210,7 @@ export async function createBooking(input: {
     });
 
     if (created.kind === "too_many") return { ok: false, error: "too_many_active_bookings" };
+    if (created.kind === "client_limit") return { ok: false, error: "client_limit_reached" };
     if (created.kind !== "ok" || !created.row) return { ok: false, error: "slot_unavailable" };
 
     logger.info("booking.created", {

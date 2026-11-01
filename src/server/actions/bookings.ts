@@ -65,6 +65,7 @@ const FAILURE_TEXT: Record<string, string> = {
   staff_not_found: "Мастер недоступен",
   staff_does_not_provide_service: "Этот мастер не оказывает выбранную услугу",
   slot_unavailable: "Это время уже занято — выберите другое",
+  client_limit_reached: "Исчерпан лимит клиентов по вашему тарифу",
   invalid_input: "Проверьте имя и телефон",
 };
 

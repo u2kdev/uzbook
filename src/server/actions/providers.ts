@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { and, desc, eq, or, sql } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import {
@@ -10,9 +11,26 @@ import {
   users,
 } from "@/server/db/schema";
 import { hashPassword, requireAdmin, requireProvider } from "@/server/auth/session";
+import { rateLimit } from "@/server/http/rate-limit";
 import { isValidSlug, slugify } from "@/lib/slug";
 import { recordAuditLog } from "@/server/payments/service";
 import type { PlanId } from "@/lib/plans";
+
+async function actionClientIp(): Promise<string> {
+  const h = await headers();
+  const realIp = h.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
+  const forwarded = h.get("x-forwarded-for");
+  if (forwarded) {
+    const parts = forwarded
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const last = parts[parts.length - 1];
+    if (last) return last;
+  }
+  return "unknown";
+}
 
 function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
@@ -46,8 +64,23 @@ export async function submitProviderApplicationAction(
   _prev: ProviderActionState,
   formData: FormData,
 ): Promise<ProviderActionState> {
+  const ip = await actionClientIp();
+  const ipLimit = rateLimit(`provider_apply_ip:${ip}`, 5, 60 * 60_000);
+  if (!ipLimit.ok) {
+    return {
+      error: "Слишком много заявок с вашего адреса. Пожалуйста, повторите попытку позже.",
+    };
+  }
+
   const fullName = String(formData.get("fullName") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
+  const normalizedPhone = normalizePhone(phone) || phone;
+  const phoneLimit = rateLimit(`provider_apply_phone:${normalizedPhone}`, 3, 60 * 60_000);
+  if (!phoneLimit.ok) {
+    return {
+      error: "Заявка с этим номером телефона уже недавно отправлялась.",
+    };
+  }
   const email = String(formData.get("email") ?? "").trim().toLowerCase() || null;
   const telegram = String(formData.get("telegram") ?? "").trim() || null;
   const city = String(formData.get("city") ?? "").trim() || null;

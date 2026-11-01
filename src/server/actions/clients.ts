@@ -6,6 +6,7 @@ import { getDb } from "@/server/db";
 import { bookings, businesses, clients, services, staff } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
 import { createBooking } from "@/server/booking/service";
+import { clientLimitError } from "@/server/limits";
 
 export type ClientSummary = {
   id: string;
@@ -420,7 +421,7 @@ export async function saveClientAction(formData: FormData): Promise<{ ok: boolea
 
   const db = await getDb();
   const [business] = await db
-    .select({ id: businesses.id })
+    .select()
     .from(businesses)
     .where(eq(businesses.ownerId, session.id))
     .limit(1);
@@ -434,6 +435,9 @@ export async function saveClientAction(formData: FormData): Promise<{ ok: boolea
 
   if (name.length < 2) return { ok: false, error: "Укажите имя клиента" };
   if (phone.replace(/\D/g, "").length < 7) return { ok: false, error: "Укажите корректный номер телефона" };
+
+  const limitErr = await clientLimitError(business, phone);
+  if (limitErr) return { ok: false, error: limitErr };
 
   await db
     .insert(clients)

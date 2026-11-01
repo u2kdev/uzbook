@@ -57,6 +57,18 @@ export async function uploadTrustedLogoAction(
     return { error: "Укажите название компании или салона" };
   }
 
+  if (linkUrl && !/^https?:\/\/.+/i.test(linkUrl)) {
+    return { error: "Ссылка должна начинаться с http:// или https://" };
+  }
+
+  if (
+    directUrl &&
+    !directUrl.startsWith("/api/uploads/") &&
+    !/^https?:\/\/.+/i.test(directUrl)
+  ) {
+    return { error: "Ссылка на изображение должна начинаться с https:// или быть загруженным файлом" };
+  }
+
   let finalImageUrl = directUrl;
   let uploadedUrl: string | null = null;
 

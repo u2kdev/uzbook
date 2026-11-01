@@ -12,7 +12,7 @@ export function isPaymentExpired(
   payment: Pick<Payment, "status" | "createdAt">,
   now = Date.now(),
 ): boolean {
-  if (payment.status !== "CREATED") return false;
+  if (payment.status !== "CREATED" && payment.status !== "PENDING") return false;
   return now - payment.createdAt.getTime() > PAYMENT_TTL_MS;
 }
 
