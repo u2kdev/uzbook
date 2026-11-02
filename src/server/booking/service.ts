@@ -391,6 +391,20 @@ export async function cancelBooking(
     reason: reason ?? null,
   });
 
+  await recordAuditLog({
+    userId: null,
+    action: "client.booking_cancelled",
+    entityType: "booking",
+    entityId: booking.id,
+    details: {
+      businessId: booking.businessId,
+      bookingId: booking.id,
+      clientName: booking.clientName,
+      clientPhone: booking.clientPhone,
+      reason: reason ?? null,
+    },
+  });
+
   return { ok: true, data: { id: booking.id } };
 }
 
@@ -496,6 +510,21 @@ export async function rescheduleBooking(
     bookingId: booking.id,
     businessId: booking.businessId,
     newStartAt: start.toISOString(),
+  });
+
+  await recordAuditLog({
+    userId: null,
+    action: "client.booking_rescheduled",
+    entityType: "booking",
+    entityId: booking.id,
+    details: {
+      businessId: booking.businessId,
+      bookingId: booking.id,
+      clientName: booking.clientName,
+      clientPhone: booking.clientPhone,
+      oldStartAt: booking.startAt.toISOString(),
+      newStartAt: start.toISOString(),
+    },
   });
 
   return { ok: true, data: { startAt: start, endAt: end } };

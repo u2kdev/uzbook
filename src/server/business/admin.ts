@@ -114,41 +114,39 @@ export async function getAdminOverview() {
   const db = await getDb();
   const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  const [businessCount] = await db.select({ value: count() }).from(businesses);
-  const [activeBusinessCount] = await db
-    .select({ value: count() })
-    .from(businesses)
-    .where(eq(businesses.status, "ACTIVE"));
-  const [userCount] = await db.select({ value: count() }).from(users);
-  const [providerCount] = await db
-    .select({ value: count() })
-    .from(users)
-    .where(eq(users.role, "PROVIDER"));
-  const [pendingProviderApps] = await db
-    .select({ value: count() })
-    .from(providerApplications)
-    .where(eq(providerApplications.status, "PENDING"));
-  const [bookingCount] = await db
-    .select({ value: count() })
-    .from(bookings)
-    .where(gte(bookings.createdAt, monthAgo));
-  const [revenue] = await db
-    .select({ value: sql<number>`coalesce(sum(${bookings.price}), 0)::int` })
-    .from(bookings)
-    .where(
-      and(
-        gte(bookings.createdAt, monthAgo),
-        inArray(bookings.status, ["CONFIRMED", "COMPLETED"]),
+  const [
+    [businessCount],
+    [activeBusinessCount],
+    [userCount],
+    [providerCount],
+    [pendingProviderApps],
+    [bookingCount],
+    [revenue],
+    activeSubs,
+  ] = await Promise.all([
+    db.select({ value: count() }).from(businesses),
+    db.select({ value: count() }).from(businesses).where(eq(businesses.status, "ACTIVE")),
+    db.select({ value: count() }).from(users),
+    db.select({ value: count() }).from(users).where(eq(users.role, "PROVIDER")),
+    db.select({ value: count() }).from(providerApplications).where(eq(providerApplications.status, "PENDING")),
+    db.select({ value: count() }).from(bookings).where(gte(bookings.createdAt, monthAgo)),
+    db
+      .select({ value: sql<number>`coalesce(sum(${bookings.price}), 0)::int` })
+      .from(bookings)
+      .where(
+        and(
+          gte(bookings.createdAt, monthAgo),
+          inArray(bookings.status, ["CONFIRMED", "COMPLETED"]),
+        ),
       ),
-    );
-
-  const activeSubs = await db
-    .select({
-      amount: subscriptions.amount,
-      providerPayoutAmount: subscriptions.providerPayoutAmount,
-    })
-    .from(subscriptions)
-    .where(eq(subscriptions.status, "ACTIVE"));
+    db
+      .select({
+        amount: subscriptions.amount,
+        providerPayoutAmount: subscriptions.providerPayoutAmount,
+      })
+      .from(subscriptions)
+      .where(eq(subscriptions.status, "ACTIVE")),
+  ]);
 
   return {
     businesses: businessCount?.value ?? 0,

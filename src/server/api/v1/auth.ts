@@ -15,7 +15,8 @@ const REFRESH_TOKEN_TTL_SEC = 60 * 60 * 24 * 30; // 30 days
 
 // Track consumed refresh token JTIs in-memory and persist to disk so each refresh
 // token can only be exchanged once even across server restarts.
-const JTI_STORE_PATH = path.resolve(process.cwd(), ".data", "consumed-jtis.json");
+const JTI_STORE_PATH =
+  process.env.JTI_STORE_PATH || path.resolve(process.cwd(), ".data", "consumed-jtis.json");
 const globalForJti = globalThis as unknown as {
   __uzbookConsumedJtis?: Map<string, number>;
   __uzbookJtiLoaded?: boolean;

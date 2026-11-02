@@ -36,7 +36,7 @@ services:
       # Only the host reverse proxy should be public. Use deploy/nginx.conf.
       - "127.0.0.1:${APP_PORT:-3000}:3000"
     volumes:
-      - uploads:/app/.data/uploads
+      - app_data:/app/.data
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s
@@ -66,7 +66,7 @@ services:
         condition: service_healthy
     volumes:
       # The upload cleanup task must see the same files as the app.
-      - uploads:/app/.data/uploads
+      - app_data:/app/.data
     command:
       [
         "sh",
@@ -76,4 +76,4 @@ services:
 
 volumes:
   pg_data:
-  uploads:
+  app_data:
