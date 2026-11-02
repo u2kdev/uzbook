@@ -29,8 +29,8 @@ function getConsumedJtiMap(): Map<string, number> {
   if (!globalForJti.__uzbookJtiLoaded) {
     globalForJti.__uzbookJtiLoaded = true;
     try {
-      if (existsSync(JTI_STORE_PATH)) {
-        const raw = JSON.parse(readFileSync(JTI_STORE_PATH, "utf8")) as Record<string, number>;
+      if (existsSync(/*turbopackIgnore: true*/ JTI_STORE_PATH)) {
+        const raw = JSON.parse(readFileSync(/*turbopackIgnore: true*/ JTI_STORE_PATH, "utf8")) as Record<string, number>;
         const now = Date.now();
         for (const [k, exp] of Object.entries(raw)) {
           if (typeof exp === "number" && exp > now) {
