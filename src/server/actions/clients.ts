@@ -83,38 +83,38 @@ export async function getClientsAction(): Promise<{
     };
   }
 
-  // 1. Fetch clients table records
-  const clientRows = await db
-    .select()
-    .from(clients)
-    .where(eq(clients.businessId, business.id))
-    .orderBy(desc(clients.createdAt));
-
-  // 2. Fetch all bookings for this business with service and staff names
-  const bookingRows = await db
-    .select({
-      id: bookings.id,
-      clientId: bookings.clientId,
-      clientName: bookings.clientName,
-      clientPhone: bookings.clientPhone,
-      clientEmail: bookings.clientEmail,
-      startAt: bookings.startAt,
-      endAt: bookings.endAt,
-      status: bookings.status,
-      price: bookings.price,
-      serviceId: bookings.serviceId,
-      serviceName: services.name,
-      staffId: bookings.staffId,
-      staffName: staff.name,
-      cancellationReason: bookings.cancelReason,
-      source: bookings.source,
-      note: bookings.note,
-    })
-    .from(bookings)
-    .leftJoin(services, eq(bookings.serviceId, services.id))
-    .leftJoin(staff, eq(bookings.staffId, staff.id))
-    .where(eq(bookings.businessId, business.id))
-    .orderBy(desc(bookings.startAt));
+  // 1. Fetch clients and bookings in parallel
+  const [clientRows, bookingRows] = await Promise.all([
+    db
+      .select()
+      .from(clients)
+      .where(eq(clients.businessId, business.id))
+      .orderBy(desc(clients.createdAt)),
+    db
+      .select({
+        id: bookings.id,
+        clientId: bookings.clientId,
+        clientName: bookings.clientName,
+        clientPhone: bookings.clientPhone,
+        clientEmail: bookings.clientEmail,
+        startAt: bookings.startAt,
+        endAt: bookings.endAt,
+        status: bookings.status,
+        price: bookings.price,
+        serviceId: bookings.serviceId,
+        serviceName: services.name,
+        staffId: bookings.staffId,
+        staffName: staff.name,
+        cancellationReason: bookings.cancelReason,
+        source: bookings.source,
+        note: bookings.note,
+      })
+      .from(bookings)
+      .leftJoin(services, eq(bookings.serviceId, services.id))
+      .leftJoin(staff, eq(bookings.staffId, staff.id))
+      .where(eq(bookings.businessId, business.id))
+      .orderBy(desc(bookings.startAt)),
+  ]);
 
   // Build a map of phone -> bookings
   const bookingsByPhone = new Map<string, typeof bookingRows>();

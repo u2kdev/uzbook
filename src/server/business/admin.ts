@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import {
   auditLogs,
@@ -171,24 +171,27 @@ export type AdminUserRow = {
 
 export async function getAdminUsers(): Promise<AdminUserRow[]> {
   const db = await getDb();
-  const rows = await db
-    .select({
-      user: users,
-      businessId: businesses.id,
-      businessName: businesses.name,
-    })
-    .from(users)
-    .leftJoin(businesses, eq(businesses.ownerId, users.id))
-    .orderBy(desc(users.createdAt));
-
-  const providerBiz = await db
-    .select({ providerId: businesses.providerId })
-    .from(businesses);
+  const [rows, providerBizCounts] = await Promise.all([
+    db
+      .select({
+        user: users,
+        businessId: businesses.id,
+        businessName: businesses.name,
+      })
+      .from(users)
+      .leftJoin(businesses, eq(businesses.ownerId, users.id))
+      .orderBy(desc(users.createdAt)),
+    db
+      .select({ providerId: businesses.providerId, count: count() })
+      .from(businesses)
+      .where(isNotNull(businesses.providerId))
+      .groupBy(businesses.providerId),
+  ]);
 
   const provCountMap = new Map<string, number>();
-  for (const b of providerBiz) {
+  for (const b of providerBizCounts) {
     if (b.providerId) {
-      provCountMap.set(b.providerId, (provCountMap.get(b.providerId) ?? 0) + 1);
+      provCountMap.set(b.providerId, Number(b.count));
     }
   }
 
@@ -495,10 +498,26 @@ export async function getPlatformAuditLogs(limit = 300): Promise<EnrichedAuditLo
     .orderBy(desc(auditLogs.createdAt))
     .limit(limit);
 
-  const allBiz = await db
-    .select({ id: businesses.id, name: businesses.name })
-    .from(businesses);
-  const bizMap = new Map(allBiz.map((b) => [b.id, b.name]));
+  const relevantBizIds = [
+    ...new Set(
+      rows
+        .map((r) => {
+          if (r.log.entityType === "business") return r.log.entityId;
+          const details = (r.log.details ?? {}) as Record<string, unknown>;
+          return typeof details.businessId === "string" ? details.businessId : null;
+        })
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const bizRows =
+    relevantBizIds.length > 0
+      ? await db
+          .select({ id: businesses.id, name: businesses.name })
+          .from(businesses)
+          .where(inArray(businesses.id, relevantBizIds))
+      : [];
+  const bizMap = new Map(bizRows.map((b) => [b.id, b.name]));
 
   return rows.map((r) => {
     const details = (r.log.details ?? {}) as Record<string, unknown>;
