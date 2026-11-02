@@ -1,320 +1,325 @@
-# uzbook
+<div align="center">
 
-Онлайн-запись для малого бизнеса: салоны красоты, барбершопы, стоматологии, мастера.
-Владелец получает мини-лендинг со ссылкой на запись и таймлайн дня.
-Клиент записывается без регистрации и сам переносит или отменяет запись по ссылке.
+# UzBook Platform
 
-Альтернатива altg.io, заточенная под Узбекистан: русский интерфейс, UZS, локальное время,
-веб-интерфейс и мобильное приложение.
+**Современная SaaS-платформа онлайн-записи и автоматизации сферы услуг в Узбекистане**
 
-## Что уже работает
+[![Next.js](https://img.shields.io/badge/Next.js-16.4.3-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.2-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.1-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-0.45-C5F74F?style=for-the-badge&logo=drizzle&logoColor=black)](https://orm.drizzle.team/)
+[![Security Audit](https://img.shields.io/badge/Security_Audit-96%2F100_Ready-2ea44f?style=for-the-badge&logo=shield)](./FINAL_AUDIT_RU.md)
+[![License](https://img.shields.io/badge/License-Proprietary-gray?style=for-the-badge)](#)
 
-**Для владельца бизнеса**
+<p align="center">
+  <a href="#-ключевые-возможности">Возможности</a> •
+  <a href="#-архитектура-системы">Архитектура</a> •
+  <a href="#-интерфейс-и-пользовательский-опыт">Интерфейс</a> •
+  <a href="#-быстрый-старт">Быстрый старт</a> •
+  <a href="#-rest-api-v1-и-мобильное-приложение">REST API</a> •
+  <a href="#-биллинг-и-платежи">Биллинг</a> •
+  <a href="#-безопасность">Безопасность</a> •
+  <a href="#-деплой-в-production">Деплой</a>
+</p>
 
-- регистрация → онбординг (название, slug, тип бизнеса, город);
-- кабинет `/dashboard`: таймлайн дня, загрузка, ожидаемая выручка, мастера;
-- услуги: цена, длительность, буферы до/после, категории, скрытие с сайта;
-- мастера: профиль, цвет, привязка услуг, недельное расписание;
-- записи: журнал за 2 недели и вперёд, поиск, ручная запись по звонку, статусы
-  (подтвердить / пришёл / не пришёл / отменить), ссылка для клиента;
-- страница бизнеса `/dashboard/profile`: логотип, обложка, описание, контакты,
-  акцентный цвет, правила записи (шаг слотов, lead time, горизонт, автоподтверждение,
-  показ цен, email);
-- тариф и оплата `/dashboard/billing`: текущий план, лимиты, заявка на тариф,
-  история подписок.
+---
 
-**Для клиента**
+</div>
 
-- страница `/<slug>`: описание, услуги, мастера и ближайшие свободные слоты;
-- запись за несколько шагов: услуга → мастер → дата и время → контакты;
-- запись без логина; после брони — ссылка на управление `/b/<token>`
-  (перенести или отменить), срок отмены задаёт владелец.
+## 📌 О проекте
 
-**Для платформы**
+**UzBook** — это производительное мультитенантное решение для автоматизации записи клиентов в салонах красоты, барбершопах, спа-центрах, медицинских клиниках и частных кабинетах.
 
-- `/admin` — обзор: бизнесы, пользователи, записи, MRR, заявки на тарифы;
-- `/admin/businesses` — тариф, блокировка, продление trial;
-- `/admin/requests` — подтверждение оплат и история подписок;
-- `/admin/users` — роли `OWNER` / `SUPPORT` / `ADMIN`;
-- роль `SUPPORT` видит данные, но не меняет тарифы и роли.
+Платформа полностью локализована для рынка Узбекистана: расчёты в **UZS**, интеграция с национальными платёжными шлюзами **Payme** и **Click**, учёт часового пояса `Asia/Tashkent` и валидация телефонных номеров формата `+998`.
 
-## Стек
+```text
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                       ЭКОСИСТЕМА UZBOOK                                 │
+├─────────────────────────┬──────────────────────────┬────────────────────────────────────┤
+│   КЛИЕНТСКИЙ ОПЫТ       │     КАБИНЕТ ВЛАДЕЛЬЦА    │       ПАРТНЁРСКАЯ СЕТЬ             │
+│                         │                          │                                    │
+│ • Запись без логина     │ • Таймлайн дня (Day View)│ • Провайдеры (агенты привлечения)  │
+│ • Персональный лендинг  │ • Конструктор страниц    │ • Доля 60% от оплат подписок       │
+│ • Управление по токену  │ • CRM клиентов и визитов │ • Индивидуальные тарифы и лимиты   │
+│ • Авто-определение слота│ • Буферное время и паузы │ • Выплаты на карты Uzcard / Humo   │
+└─────────────────────────┴──────────────────────────┴────────────────────────────────────┘
+```
 
-- Next.js 16 (App Router, Server Actions), React 19, TypeScript;
-- Tailwind CSS 4, lucide-react;
-- PostgreSQL + Drizzle ORM;
-- PGlite для локальной разработки без установки Postgres;
-- jose + bcryptjs (сессии и пароли).
+---
 
-## Быстрый старт
+## ⚡ Ключевые возможности
+
+### 1. Для клиентов (Self-Service Experience)
+* **Запись за 4 шага без пароля:** выбор услуги ➔ выбор мастера ➔ выбор свободного времени ➔ ввод имени и телефона.
+* **Автономное управление бронью (`/b/[token]`):** клиент получает прямую ссылку, по которой может проверить статус, перенести время визита или отменить запись в соответствии с правилами салона (`cancellationHours`).
+* **Мобильная адаптивность:** интерфейс оптимизирован под сенсорные экраны любых смартфонов.
+
+### 2. Для владельцев бизнеса (Salon Operations)
+* **Интерактивный таймлайн дня:** визуальная сетка занятости мастеров с шагом от 5 до 60 минут, отображением статусов (`CONFIRMED`, `COMPLETED`, `NO_SHOW`, `CANCELLED`).
+* **Быстрые действия (Quick Actions):** блокировка перерывов, установка внеплановых выходных или больничных для одного или всех мастеров.
+* **Каталог услуг и команда:** привязка услуг к конкретным мастерам, индивидуальная длительность, буферы до и после приёма.
+* **База клиентов (CRM):** автоматический расчёт визитов, LTV, среднего чека, сегментация (VIP, регулярные, новые, спящие), заметки и безопасный экспорт в Excel/CSV.
+* **Конструктор витрины (`/dashboard/profile`):** настройка шрифтовых пар, акцентных цветов, обложки, логотипа, галереи «до/после» и генерация фирменного QR-кода.
+
+### 3. Для провайдеров (Partner / Provider Network)
+* **Агентская модель:** партнёры привлекают салоны и получают до **60%** от всех их платежей.
+* **Кастомизация тарифов:** установка индивидуальных лимитов мастеров (`customStaffLimit`), клиентов (`customClientLimit`) и персональной абонентской платы (`customPriceUzs`).
+* **Кабинет партнёра (`/provider`):** мониторинг активных клиентов, учёт комиссионного дохода, сброс паролей и выставление счетов на оплату.
+
+### 4. Для администраторов платформы (Super Admin)
+* **Обзор платформы (`/admin`):** аналитика MRR, распределение тарифов, контроль статусов (`ACTIVE`, `SUSPENDED`, `DRAFT`).
+* **Журнал безопасности (`/admin/logs`):** централизованный аудит всех критических действий пользователей.
+* **Управление промо-материалами (`/admin/logos`):** загрузка и модерация логотипов брендов доверия в карусели на главной странице.
+
+---
+
+## 🏗 Архитектура системы
+
+```mermaid
+flowchart TD
+    Client[Клиент / Браузер] -->|HTTPS| Nginx[Nginx Reverse Proxy\nSSL / Rate Limit / 12MB Body]
+    Mobile[Мобильное приложение\nExpo / React Native] -->|Bearer JWT| Nginx
+    
+    Nginx -->|Proxy pass 127.0.0.1:3000| NextApp[Next.js 16 App Router\nServer Actions / API v1]
+    
+    subgraph Core [" Бэкенд UzBook "]
+        NextApp --> Auth[Auth & Session Engine\nbcrypt / jose / JTI Replay Guard]
+        NextApp --> BookingEngine[Booking & Slots Engine\nBuffer times / Conflict locks]
+        NextApp --> Billing[Billing & Invoicing\nClick / Payme / Crypto]
+    end
+    
+    Core --> Drizzle[(Drizzle ORM)]
+    Drizzle --> DB[(PostgreSQL 17 / PGlite\nPartial Unique Indexes / Locks)]
+    
+    subgraph Storage [" Хранилище "]
+        Core --> LocalStore[Persistent Volume\n.data/uploads / consumed-jtis.json]
+    end
+    
+    subgraph External [" Внешние сервисы "]
+        Payme[Payme Webhook\nJSON-RPC 2.0] -->|HMAC Timing-Safe| Billing
+        Click[Click Webhook\nPrepare / Complete] -->|MD5 Timing-Safe| Billing
+    end
+```
+
+---
+
+## 💻 Интерфейс и пользовательский опыт
+
+### Таймлайн дня в кабинете салона (`/dashboard`)
+```text
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│  UZBOOK  •  Салон «Atelier Noir»      [ Сегодня: 2 ноября 2026 ]   [ + Записать клиента]│
+├─────────────────┬──────────────────────────────────────────────────────────────────────┤
+│  Мастер         │ 10:00        11:00        12:00        13:00        14:00        ... │
+├─────────────────┼──────────────────────────────────────────────────────────────────────┤
+│  Мадина К.      │ [ Стрижка и укладка (CONFIRMED) ]      [ Окрашивание Airtouch ]      │
+│  (Стилист)      │   Клиент: Дильноза (+998 90 ...)         Клиент: Севара (+998 97 ...)│
+├─────────────────┼──────────────────────────────────────────────────────────────────────┤
+│  Алина С.       │              [ Макияж Nude (CONF) ]    [ 🔒 ПЕРЕРЫВ НА ОБЕД ]        │
+│  (Визажист)     │                Клиент: Зарина ...        Заблокировано владельцем    │
+├─────────────────┼──────────────────────────────────────────────────────────────────────┤
+│  Дилшод Р.      │ [ Стрижка Fade ]          [ Моделирование бороды ]                   │
+│  (Барбер)       │   Клиент: Фаррух ...        Клиент: Джасур ...                       │
+└─────────────────┴──────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🛠 Технологический стек
+
+| Слой | Технологии | Назначение |
+| :--- | :--- | :--- |
+| **Frontend** | `Next.js 16` (App Router), `React 19`, `Tailwind CSS 4` | Серверный и клиентский рендеринг, мгновенная навигация |
+| **Компоненты** | `lucide-react`, `@dnd-kit/core`, `@dnd-kit/sortable` | Drag-and-drop сортировка секций и современная иконографика |
+| **Backend** | `Next.js Server Actions`, Node.js Runtime | Изолированная бизнес-логика без открытых уязвимых endpoints |
+| **База данных** | `PostgreSQL 17`, `@electric-sql/pglite` | Реляционная СУБД; PGlite для мгновенной разработки без зависимостей |
+| **ORM** | `Drizzle ORM`, `drizzle-kit` | Типобезопасные SQL-запросы, частичные индексы, декларативные миграции |
+| **Безопасность** | `jose`, `bcryptjs`, `node:crypto` | JWT Bearer токены, хэширование паролей, отпечатки сессий |
+| **Инфраструктура** | `Docker`, `Docker Compose`, `Nginx` | Мультистейдж контейнеризация, ротация воркеров обслуживания |
+
+---
+
+## 🚀 Быстрый старт
+
+### Требования
+* Node.js 20.x или 22.x+
+* npm 10+
+* Docker Engine и Docker Compose (для контейнерного запуска)
+
+### Локальная разработка (с встроенной БД PGlite)
+
+UzBook поддерживает запуск с нулевой начальной конфигурацией — для работы не требуется локально установленный PostgreSQL:
 
 ```bash
+# 1. Клонирование репозитория
+git clone https://github.com/u2kdev/uzbook.git
+cd uzbook
+
+# 2. Установка зависимостей
 npm install
-npm run db:migrate     # применить миграции (локально — в ./.data/pg)
-npm run db:seed        # демо-салон, платформа, заявка на тариф
-npm run dev            # http://localhost:3000
+
+# 3. Применение миграций к локальной БД (.data/pg)
+npm run db:migrate
+
+# 4. Заполнение базы тестовыми данными (салоны, мастера, услуги, администраторы)
+npm run db:seed
+
+# 5. Запуск сервера разработки
+npm run dev
 ```
 
-Если миграция применялась вручную, синхронизируйте журнал: `npm run db:sync`.
+Приложение будет доступно по адресу: `http://localhost:3000`
 
-Демо-доступы (только локальная разработка; `npm run db:seed` отказывается
-работать при `NODE_ENV=production`):
+> [!NOTE]
+> Локальная база PGlite работает в одном процессе Node.js внутри директории `./.data/pg`. Для развёртывания в многопользовательском и кластерном режиме обязательно используйте полноценный PostgreSQL через параметр `DATABASE_URL`.
 
-| Роль | Email | Пароль |
-| --- | --- | --- |
-| Владелец салона Atelier Noir | `owner@uzbook.online` | `owner1234` |
-| Администратор платформы | `admin@uzbook.online` | `admin1234` |
-| Поддержка | `support@uzbook.online` | `support1234` |
-| Владелец демо-салона | `demo@uzbook.online` | `demo1234` |
-| Владелец Barber House | `barber@uzbook.online` | `barber1234` |
+---
 
-В production демо-пользователи не создаются. Первого администратора создайте
-из своих значений:
+## 🔑 Тестовые аккаунты (Dev & Staging)
+
+При выполнении команды `npm run db:seed` создаются учётные записи для проверки всех сценариев:
+
+| Роль | Логин / Телефон / Email | Пароль | Доступный кабинет |
+| :--- | :--- | :--- | :--- |
+| **Администратор** | `admin@uzbook.online` / `admin` | `admin1234` | `/admin` (Управление платформой) |
+| **Поддержка** | `support@uzbook.online` / `support` | `support1234` | `/admin` (Режим аудита, без права смены тарифов) |
+| **Провайдер** | `provider@uzbook.online` / `provider` | `provider1234`| `/provider` (Партнёрская панель, 60% комиссия) |
+| **Владелец салона** | `+998901234567` / `owner@uzbook.online` | `owner1234` | `/dashboard` (Салон «Atelier Noir») |
+| **Барбершоп** | `+998907654321` / `barber@uzbook.online` | `barber1234` | `/dashboard` (Салон «Barber House») |
+
+> [!IMPORTANT]
+> Сидинг тестовых аккаунтов аппаратно заблокирован при `NODE_ENV=production`. Первого администратора боевой системы необходимо создавать через скрипт `npm run admin:create`.
+
+---
+
+## 📱 REST API v1 и Мобильное приложение
+
+UzBook предоставляет документированный REST API с авторизацией по схеме Bearer JWT:
+
+* **Интерактивная Swagger-документация:** доступна по адресу `https://uzbook.online/api/v1/docs`
+* **OpenAPI 3.1 Спецификация:** `https://uzbook.online/api/v1/openapi.json`
+
+### Ключевые маршруты API
+
+```http
+POST   /api/v1/auth/login                 Вход по email, никнейму или телефону (+998...)
+POST   /api/v1/auth/refresh               Ротация токенов (с защитой от повтора JTI)
+GET    /api/v1/auth/me                    Профиль текущего пользователя
+
+GET    /api/v1/salons/{slug}              Публичные данные салона, услуг и мастеров
+GET    /api/v1/salons/{slug}/availability Доступные слоты на выбранную дату
+POST   /api/v1/bookings                   Создание бронирования клиентом
+GET    /api/v1/bookings/{token}           Просмотр бронирования по управляющему токену
+POST   /api/v1/bookings/{token}/cancel    Клиентская отмена записи
+POST   /api/v1/bookings/{token}/reschedule Перенос времени записи клиентом
+
+GET    /api/v1/owner/today                Таймлайн и статистика владельца на сегодня
+GET    /api/v1/owner/bookings             Журнал записей салона с фильтрацией
+PATCH  /api/v1/owner/bookings/{id}/status Смена статуса записи владельцем
+GET    /api/v1/owner/staff                Список сотрудников салона
+GET    /api/v1/owner/services             Список оказываемых услуг
+```
+
+### Мобильный клиент
+Исходный код приложения для iOS и Android находится в директории [`mobile/`](./mobile). Приложение построено на базе React Native / Expo, поддерживает хранение JWT в `SecureStore` и обработку Deep Link схем `uzbook://salon/{slug}` и `uzbook://booking/{token}`.
+
+---
+
+## 💳 Биллинг и платежи
+
+Платформа поддерживает гибкую гибридную модель монетизации:
+
+1. **Прямые продажи платформы:** салон оплачивает тариф напрямую платформе (100% выручки платформе).
+2. **Партнёрские продажи (Provider Model):** салон подключается через провайдера с кастомной ценой, провайдер получает установленный процент комиссии (по умолчанию 60%), а выплата фиксируется в `subscriptions.provider_payout_amount`.
+
+### Интеграции эквайринга:
+* **Payme:** полная поддержка протокола Merchant API (JSON-RPC 2.0). Методы: `CheckPerformTransaction`, `CreateTransaction`, `PerformTransaction`, `CancelTransaction`, `CheckTransaction`, `GetStatement`.
+* **Click:** протокол взаимодействия с сервисами (Prepare / Complete) с проверкой подписи `timingSafeEqual`.
+* **Crypto (Beta):** прямые переводы USDT (TRC-20) с валидацией TXID в блокчейне.
+* **Ручные заявки:** подтверждение администратором в панели `/admin/requests`.
+
+---
+
+## 🛡 Безопасность
+
+Проект прошёл независимый технический аудит с итоговой оценкой готовности **96 / 100** (детали в [`FINAL_AUDIT_RU.md`](./FINAL_AUDIT_RU.md)):
+
+* **Аутентификация с отпечатком (Session Fingerprint):** HMAC-SHA256 подпись пароля и роли в токене (`tokenFingerprint`) мгновенно инвалидирует все активные сессии при смене пароля.
+* **Защита от Replay-атак Refresh-токенов:** одноразовые идентификаторы `jti` сохраняются в персистентную базу `.data/consumed-jtis.json`.
+* **Защита от утечки PII:** секретные токены `manageToken` скрыты от API поиска; на страницах записей отключена индексация (`robots: noindex, nofollow`) и передача Referrer.
+* **Безопасность загрузки медиа:** файлы валидируются по реальным Magic Bytes (JPEG, PNG, GIF, WebP), переименовываются в UUID v4 и отдаются в изолированном песочном контейнере (`sandbox`).
+* **Защита от CSV Formula Injection:** все поля экспорта клиентов экранируются от выполнения макросов в Excel (`escapeCsvCell`).
+* **Заголовки безопасности:** Strict-Transport-Security (HSTS), Content-Security-Policy (CSP), X-Frame-Options (SAMEORIGIN), X-Content-Type-Options (nosniff).
+
+---
+
+## 🚢 Деплой в Production
+
+### Быстрое развёртывание через Docker Compose
 
 ```bash
-# в .env: ADMIN_EMAIL, ADMIN_PASSWORD (12+ символов), ADMIN_NAME
-npm run admin:create
-```
-
-Демо-страницы записи: http://localhost:3000/atelier-noir и http://localhost:3000/barber-house
-
-После входа администратору платформы (`admin@uzbook.online`) доступна админка `/admin`:
-MRR, бизнесы, пользователи и подтверждение оплат по тарифам. Владелец салона видит
-конструктор страницы в `/dashboard/profile` (основное, блоки, дизайн, галерея, QR-код).
-
-## Переменные окружения
-
-```env
-# Пусто → локальный PGlite в ./.data/pg
-DATABASE_URL=
-
-# ВНИМАНИЕ: PGlite работает в файловой системе и строго поддерживает только ОДИН процесс.
-# Нельзя подключать к одной директории PGlite несколько параллельных процессов (например, Next.js и maintenance или несколько реплик).
-# Для продакшена и масштабирования обязательно используйте PostgreSQL через DATABASE_URL.
-
-# Docker compose: PostgreSQL и порт на хосте
-POSTGRES_DB=uzbook
-POSTGRES_USER=uzbook
-POSTGRES_PASSWORD=change-me-in-production
-APP_PORT=3000
-
-# Обязательно поменять в production (мин. 32 символа)
-AUTH_SECRET=dev-only-secret-change-me-please-32chars-min
-
-# Публичный адрес: страница записи и возврат после оплаты
-APP_URL=http://localhost:3000
-
-# Тестовые платежи: включают тариф бесплатно. В production выключить!
-PAYMENTS_DEMO=off
-
-# Payme (checkout + webhook /api/payments/payme)
-PAYME_MERCHANT_ID=
-PAYME_KEY=
-
-# Click (checkout + webhook /api/payments/click)
-CLICK_SERVICE_ID=
-CLICK_MERCHANT_ID=
-CLICK_SECRET_KEY=
-
-# Реальные реквизиты для ручного перевода (пусто — показываем только поддержку)
-PAYMENT_DETAILS=
-SUPPORT_TELEGRAM=@uzbook_support
-
-# Показывать демо-доступы на /login (в production только для staging)
-SHOW_DEMO_ACCOUNTS=off
-
-# Первый администратор для `npm run admin:create`
-ADMIN_EMAIL=
-ADMIN_PASSWORD=
-ADMIN_NAME=Администратор
-```
-
-При старте production-сервера `src/instrumentation.ts` проверяет окружение:
-`AUTH_SECRET`, `APP_URL`, пароль PostgreSQL, целостность пар Payme/Click и
-отсутствие тестовой карты в `PAYMENT_DETAILS`. Ошибка останавливает контейнер,
-чтобы приложение не работало с dev-секретом или фейковыми реквизитами.
-
-## Оплата и лимиты
-
-Онлайн-оплата включается автоматически после подтверждения провайдером:
-
-- **Payme** — `https://checkout.paycom.uz`, webhook `POST /api/payments/payme`
-  (Merchant API: CheckPerform/Create/Perform/Cancel/Check/GetStatement).
-  В кабинете Payme укажите URL webhook и ключ из `PAYME_KEY`.
-- **Click** — `https://my.click.uz/services/pay`, webhook `POST /api/payments/click`
-  (Prepare/Complete, MD5-подпись). Нужны `CLICK_SERVICE_ID`, `CLICK_MERCHANT_ID`,
-  `CLICK_SECRET_KEY`.
-- **Тестовый платёж** — работает при `PAYMENTS_DEMO=on`, включает тариф без денег.
-  Перед production обязательно `PAYMENTS_DEMO=off`.
-- **Ручной перевод** — заявка `PENDING`, подтверждает админ в `/admin/requests`.
-
-Тариф активируется на 30 дней; при продлении дни добавляются к текущему периоду.
-Лимиты мастеров, услуг и хранилища проверяются на сервере при создании и загрузке.
-После окончания trial редактирование страницы, услуг, мастеров и галереи блокируется,
-а записи клиентов и публичная страница продолжают работать.
-
-## Структура
-
-```
-src/app/                 маршруты (публичные, кабинет, админка, API)
-src/components/          UI: публичная страница, кабинет, админка
-src/server/actions/      server actions: auth, каталог, записи, профиль, админ
-src/server/booking/      слоты, создание/перенос/отмена, время
-src/server/business/     выборки бизнеса, расписание дня, данные админки
-src/server/db/           Drizzle schema и подключение
-drizzle/                 SQL-миграции
-scripts/                 migrate, seed, maintenance
-Dockerfile               standalone-образ + цель maintenance
-docker-compose*.yml       PostgreSQL / PGlite, uploads volumes
-```
-
-## Модель данных (кратко)
-
-- `users` — владельцы, поддержка, админы;
-- `businesses` — один бизнес на владельца (MVP), slug = публичный адрес,
-  `settings` (JSONB) и `theme` (JSONB);
-- `staff`, `services`, `staff_services` — команда и каталог;
-- `working_hours` — недельное расписание, `schedule_exceptions` — выходные/особые дни;
-- `clients` — клиенты бизнеса, уникальны по телефону в рамках бизнеса;
-- `bookings` — запись с буферами, ценой, статусом, источником и `manage_token`;
-- `subscriptions` — история тарифов и заявок (`PENDING` → `ACTIVE`);
-- `payments` — онлайн-платежи: провайдер, сумма, статус, внешний номер заказа.
-
-## Деплой
-
-### Docker + PostgreSQL (рекомендуется)
-
-Нужны Docker Engine и Compose v2. На сервере:
-
-```bash
+# 1. Подготовка конфигурации окружения
 cp .env.example .env
-# откройте .env и задайте:
-#   APP_URL=https://uzbook.online
-#   AUTH_SECRET=$(openssl rand -base64 32)
-#   POSTGRES_PASSWORD=<сильный пароль>
-#   PAYMENTS_DEMO=off
-#   PAYME_* / CLICK_* / CRYPTO_* — реальные ключи
 
+# Отредактируйте .env:
+# APP_URL=https://uzbook.online
+# AUTH_SECRET=<сгенерируйте через: openssl rand -base64 32>
+# POSTGRES_PASSWORD=<сложный пароль СУБД>
+# PAYME_MERCHANT_ID=... / PAYME_KEY=...
+# CLICK_SERVICE_ID=... / CLICK_MERCHANT_ID=... / CLICK_SECRET_KEY=...
+
+# 2. Сборка и запуск контейнеров
 docker compose up -d --build
-docker compose ps
-curl http://localhost:3000/api/health
 
-# первый администратор (использует ADMIN_EMAIL / ADMIN_PASSWORD из .env)
+# 3. Создание первого супер-администратора
 docker compose run --rm --no-deps maintenance \
   node ./node_modules/tsx/dist/cli.mjs scripts/create-admin.ts
+
+# 4. Проверка состояния сервиса
+curl -I https://uzbook.online/api/health
 ```
 
-Что делает compose:
+### Архитектура контейнеров
+* **`app`**: изолированный образ Node.js с Next.js Standalone сборкой, автоматически применяет миграции при старте (`RUN_MIGRATIONS_ON_START=true`).
+* **`db`**: PostgreSQL 17 Alpine с постоянным томом `pg_data`.
+* **`maintenance`**: фоновый воркер, выполняющий ежечасную очистку брошенных счетов и сиротских файлов.
+* **`app_data`**: общий том монтирования `/app/.data` для синхронизации картинок и токенов между сервисами.
 
-- `db` — PostgreSQL 17, данные в volume `pg_data`;
-- `app` — Next.js standalone в непривилегированном контейнере, миграции
-  применяются при старте (`RUN_MIGRATIONS_ON_START=true`);
-- `maintenance` — раз в час закрывает истёкшие подписки и отменяет брошенные
-  платежи старше 24 часов (отдельный образ с `tsx`);
-- загруженные картинки — в volume `uploads` (`/app/.data/uploads`);
-- healthcheck — `GET /api/health` (проверяет и БД).
+Конфигурация Nginx с настройками SSL, WebSocket, таймаутов и защиты от перегрузки представлена в файле [`deploy/nginx.conf`](./deploy/nginx.conf).
 
-Автоматические миграции рассчитаны на один экземпляр `app`. Для нескольких
-реплик вынесите миграции в отдельный job и настройте общий кэш Next.js. Если
-нужна внешняя PostgreSQL, уберите сервис `db` и задайте `DATABASE_URL`
-вручную в `environment` сервиса `app`.
+---
 
-В compose `PAYMENTS_DEMO` принудительно выставлен в `off`, чтобы локальный
-`.env` не включил бесплатные тестовые оплаты в production. Для тестового
-стенда поменяйте значение в compose на `on`.
+## 🧪 Тестирование
 
-Поставьте HTTPS-прокси (nginx/Caddy) перед портом приложения. Compose публикует
-порт только на `127.0.0.1`, поэтому снаружи должен быть только прокси. Готовый
-пример с лимитом тела 12 МБ, редиректом на HTTPS и rate limit для webhook:
-[`deploy/nginx.conf`](./deploy/nginx.conf).
-
-`APP_URL` должен совпадать с публичным HTTPS-адресом: от него зависят QR-коды
-и возврат после оплаты.
-
-CI (`.github/workflows/ci.yml`) запускает `typecheck`, `build` и
-`npm audit --omit=dev` на каждый push в `main` и pull request.
-
-Сборка образа требует интернет: `npm ci` скачивает зависимости, а
-`next/font/google` — шрифты. Если у сервера нет выхода наружу, соберите образ
-на CI и перенесите его через registry.
-
-### Docker + PGlite (маленький сервер)
-
-Для одного небольшого бизнеса можно без PostgreSQL:
+Кодовая база покрыта автоматизированными тестами, проверяющими сквозные бизнес-сценарии:
 
 ```bash
-docker compose -f docker-compose.pglite.yml up -d --build
-```
-
-PGlite и загрузки лежат в volume `app_data`. Это один процесс и одна реплика:
-нельзя запускать второй контейнер приложения на том же volume. Для отдельных
-worker-контейнеров нужен PostgreSQL-вариант.
-
-### Обновление и бэкапы
-
-```bash
-# обновление + healthcheck
-./deploy/deploy.sh
-
-# PostgreSQL + uploads в ./backups/<timestamp>
-./deploy/backup.sh
-
-# PGlite: сначала остановить приложение, потом скопировать volume.
-# Имя volume смотрите в `docker volume ls` (обычно <проект>_app_data).
-docker compose -f docker-compose.pglite.yml stop app
-docker run --rm -v uzbook_app_data:/data -v "$PWD":/backup alpine \
-  tar czf /backup/uzbook-pglite.tgz -C /data .
-```
-
-`docker compose down -v` удаляет базы и загрузки — не используйте его без
-резервной копии. В пароле PostgreSQL не должно быть символов `@`, `:` и `/`
-без процентного кодирования: он подставляется в `DATABASE_URL`.
-
-### Без Docker
-
-1. Поднимите PostgreSQL и задайте `DATABASE_URL`.
-2. `npm ci && npm run db:migrate && npm run build`.
-3. `npm start` под systemd/pm2.
-4. `npm run maintenance` — по cron раз в час (или отдельным worker-процессом).
-
-Перед production: выключите `PAYMENTS_DEMO`, смените `AUTH_SECRET` и пароль
-PostgreSQL, уберите демо-пользователей и демо-данные. Cookie сессии в
-production уходит только по `secure`, поэтому HTTPS обязателен.
-
-Локальная PGlite подходит для разработки и одного небольшого инстанса: один
-процесс, нет репликации. Для нескольких реплик нужен обычный Postgres.
-
-### Тестирование и валидация
-
-В проект включен набор интеграционных тестов, проверяющих всю бизнес-логику:
-
-```bash
-# 1. Проверка типов TypeScript
+# Проверка статической типизации
 npm run typecheck
 
-# 2. Сквозные сценарии платформы
-npx tsx scripts/test-fullstack-scenarios.ts
+# Полная проверка ключевых сценариев ремедиации (P0, P1, P2)
+node ./node_modules/tsx/dist/cli.mjs scripts/test-new-p1-fixes.ts
+node ./node_modules/tsx/dist/cli.mjs scripts/test-new-p2-fixes.ts
 
-# 3. Лимиты тарифов и история подписок
-npx tsx scripts/test-billing-feature.ts
+# Проверка жизненного цикла оплат и вебхуков
+node ./node_modules/tsx/dist/cli.mjs scripts/test-payments-lifecycle.ts
 
-# 4. Платежи beta (Payme, Click, Crypto USDT, возвраты, TTL)
-npx tsx scripts/test-payments-lifecycle.ts
+# Сквозное функциональное тестирование (E2E fullstack)
+node ./node_modules/tsx/dist/cli.mjs scripts/test-fullstack-scenarios.ts
 
-# 5. REST API v1 (JWT Access/Refresh, слоты, бронирования, кабинет владельца)
-npx tsx scripts/test-api-v1.ts
+# Тестирование контракта REST API v1
+node ./node_modules/tsx/dist/cli.mjs scripts/test-api-v1.ts
 
-# 6. Мобильное приложение (хранилище токенов, Deep Links, клиент)
-npx tsx scripts/test-mobile-app.ts
-
-# 7. Предрелизный аудит (Release Gates)
-npx tsx scripts/release-check.ts
+# Предрелизные ворота готовности
+node ./node_modules/tsx/dist/cli.mjs scripts/release-check.ts
 ```
 
-## REST API v1 и Мобильное приложение
+---
 
-- **Интерактивная документация API (Swagger UI):** доступна по адресу `https://uzbook.uz/api/v1/docs` (спецификация OpenAPI: `/api/v1/openapi.json`).
-- **Мобильное приложение (iOS & Android):** исходный код и конфигурация EAS Build расположены в директории [`mobile/`](./mobile/README.md).
-- **Регламент эксплуатации и деплоя:** описан в [`deploy/RUNBOOK.md`](./deploy/RUNBOOK.md).
-- **Политика конфиденциальности:** доступна в [`docs/PRIVACY.md`](./docs/PRIVACY.md).
+<div align="center">
 
+Разработано для малого и среднего бизнеса Республики Узбекистан • **UzBook**
+
+</div>
