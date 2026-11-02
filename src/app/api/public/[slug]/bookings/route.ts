@@ -42,6 +42,20 @@ export async function POST(
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
+  const isTrialExpired =
+    business.plan === "TRIAL" &&
+    Boolean(business.trialEndsAt) &&
+    (business.trialEndsAt as Date).getTime() < Date.now();
+  if (isTrialExpired) {
+    return NextResponse.json(
+      {
+        error: "trial_expired",
+        message: "Бесплатный период салона истёк. Страница онлайн-записи временно отключена.",
+      },
+      { status: 403 },
+    );
+  }
+
   let json: unknown;
   try {
     json = await request.json();

@@ -5,7 +5,13 @@ import { and, count, desc, eq, inArray, ne } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { businesses, payments, subscriptions, users } from "@/server/db/schema";
 import { requireAdmin } from "@/server/auth/session";
-import { planById, type PlanId } from "@/lib/plans";
+import {
+  BILLING_PERIODS,
+  calculatePlanPrice,
+  planById,
+  type BillingPeriodMonths,
+  type PlanId,
+} from "@/lib/plans";
 import { recordAuditLog } from "@/server/payments/service";
 
 export type AdminState = { ok?: boolean; error?: string } | null;
@@ -48,9 +54,19 @@ export async function setBusinessStatusAction(
   return { ok: true };
 }
 
+export type CustomPlanOptions = {
+  months?: BillingPeriodMonths;
+  customPriceUzs?: number | null;
+  customPlanName?: string | null;
+  discountPercent?: number | null;
+  customStaffLimit?: number | null;
+  customClientLimit?: number | null;
+};
+
 export async function setBusinessPlanAction(
   businessId: string,
   plan: PlanId,
+  options?: CustomPlanOptions,
 ): Promise<AdminState> {
   const session = await requireAdminRole();
   if (!["TRIAL", "START", "PRO", "BUSINESS"].includes(plan)) {
@@ -59,6 +75,9 @@ export async function setBusinessPlanAction(
   const db = await getDb();
   const now = new Date();
   const planObj = planById(plan);
+
+  const rawMonths = options?.months ?? 1;
+  const months = ([1, 3, 6, 12].includes(rawMonths) ? rawMonths : 1) as BillingPeriodMonths;
 
   const ok = await db.transaction(async (tx) => {
     const [existing] = await tx
@@ -88,9 +107,8 @@ export async function setBusinessPlanAction(
         ? activeSub.currentPeriodEnd
         : now;
 
-    const periodEnd = new Date(
-      baseDate.getTime() + (plan === "TRIAL" ? 14 : 30) * 24 * 60 * 60 * 1000,
-    );
+    const periodDurationDays = plan === "TRIAL" ? 14 : months * 30;
+    const periodEnd = new Date(baseDate.getTime() + periodDurationDays * 24 * 60 * 60 * 1000);
 
     await tx
       .update(subscriptions)
@@ -102,22 +120,63 @@ export async function setBusinessPlanAction(
         ),
       );
 
+    const customPlanName =
+      options?.customPlanName !== undefined
+        ? options.customPlanName?.trim() || null
+        : existing.settings?.customPlanName ?? null;
+
+    const discountPercent =
+      options?.discountPercent !== undefined
+        ? (options.discountPercent !== null && options.discountPercent > 0
+            ? Math.min(90, Math.max(0, Math.round(Number(options.discountPercent))))
+            : null)
+        : existing.settings?.discountPercent ?? null;
+
+    const customPriceUzs =
+      options?.customPriceUzs !== undefined
+        ? options.customPriceUzs
+        : existing.customPriceUzs;
+
+    const customStaffLimit =
+      options?.customStaffLimit !== undefined
+        ? options.customStaffLimit
+        : existing.customStaffLimit;
+
+    const customClientLimit =
+      options?.customClientLimit !== undefined
+        ? options.customClientLimit
+        : existing.customClientLimit;
+
+    const newSettings = {
+      ...(existing.settings ?? { autoConfirm: false, showPrices: true, requireEmail: false }),
+      customPlanName,
+      discountPercent,
+    };
+
     await tx
       .update(businesses)
       .set({
         plan,
         trialEndsAt: plan === "TRIAL" ? periodEnd : null,
+        customPriceUzs,
+        customStaffLimit,
+        customClientLimit,
+        settings: newSettings,
       })
       .where(eq(businesses.id, businessId));
 
-    const effectiveAmount =
-      plan === "TRIAL"
-        ? 0
-        : existing.customPriceUzs !== null &&
-            existing.customPriceUzs !== undefined &&
-            existing.customPriceUzs > 0
-          ? existing.customPriceUzs
-          : planObj.priceUzs;
+    const baseMonthlyPrice =
+      customPriceUzs !== null && customPriceUzs !== undefined && customPriceUzs > 0
+        ? customPriceUzs
+        : planObj.priceUzs;
+
+    const pricing = calculatePlanPrice({
+      baseMonthlyPrice,
+      months,
+      customDiscountPercent: discountPercent ?? 0,
+    });
+
+    const effectiveAmount = plan === "TRIAL" ? 0 : pricing.totalAmountUzs;
 
     let providerCommissionPercent: number | null = null;
     let providerPayoutAmount: number | null = null;
@@ -133,6 +192,19 @@ export async function setBusinessPlanAction(
       providerPayoutAmount = Math.round((effectiveAmount * commission) / 100);
     }
 
+    const planTitle = customPlanName || planObj.name;
+    const periodText =
+      plan === "TRIAL"
+        ? "14 дней"
+        : months === 1
+          ? "1 месяц"
+          : months === 12
+            ? "1 год"
+            : `${months} месяца`;
+    const discountNote =
+      pricing.discountPercent > 0 ? ` (скидка ${pricing.discountPercent}%)` : "";
+    const note = `Тариф «${planTitle}» установлен администратором на ${periodText}${discountNote}`;
+
     await tx.insert(subscriptions).values({
       businessId,
       providerId: existing.providerId ?? null,
@@ -142,11 +214,11 @@ export async function setBusinessPlanAction(
       amount: effectiveAmount,
       providerCommissionPercent,
       providerPayoutAmount,
-      customStaffLimit: existing.customStaffLimit ?? null,
-      customClientLimit: existing.customClientLimit ?? null,
+      customStaffLimit: customStaffLimit ?? null,
+      customClientLimit: customClientLimit ?? null,
       startedAt: now,
       currentPeriodEnd: periodEnd,
-      note: `Тариф установлен администратором (${plan})`,
+      note,
     });
 
     return true;
@@ -159,8 +231,84 @@ export async function setBusinessPlanAction(
     action: "business.plan_changed",
     entityType: "business",
     entityId: businessId,
-    details: { plan },
+    details: { plan, options },
   });
+  refresh();
+  return { ok: true };
+}
+
+export async function updateBusinessCustomPlanConfigAction(
+  businessId: string,
+  config: {
+    customPlanName?: string | null;
+    customPriceUzs?: number | null;
+    discountPercent?: number | null;
+    customStaffLimit?: number | null;
+    customClientLimit?: number | null;
+  },
+): Promise<AdminState> {
+  const session = await requireAdminRole();
+  const db = await getDb();
+
+  const [existing] = await db
+    .select()
+    .from(businesses)
+    .where(eq(businesses.id, businessId))
+    .limit(1);
+
+  if (!existing) return { error: "Бизнес не найден" };
+
+  const customPlanName =
+    config.customPlanName !== undefined
+      ? config.customPlanName?.trim() || null
+      : existing.settings?.customPlanName ?? null;
+
+  const discountPercent =
+    config.discountPercent !== undefined
+      ? (config.discountPercent !== null && config.discountPercent > 0
+          ? Math.min(90, Math.max(0, Math.round(Number(config.discountPercent))))
+          : null)
+      : existing.settings?.discountPercent ?? null;
+
+  const newSettings = {
+    ...(existing.settings ?? { autoConfirm: false, showPrices: true, requireEmail: false }),
+    customPlanName,
+    discountPercent,
+  };
+
+  await db
+    .update(businesses)
+    .set({
+      customPriceUzs:
+        config.customPriceUzs !== undefined
+          ? (config.customPriceUzs !== null && config.customPriceUzs > 0
+              ? Math.round(config.customPriceUzs)
+              : null)
+          : existing.customPriceUzs,
+      customStaffLimit:
+        config.customStaffLimit !== undefined
+          ? (config.customStaffLimit !== null && config.customStaffLimit > 0
+              ? Math.round(config.customStaffLimit)
+              : null)
+          : existing.customStaffLimit,
+      customClientLimit:
+        config.customClientLimit !== undefined
+          ? (config.customClientLimit !== null && config.customClientLimit > 0
+              ? Math.round(config.customClientLimit)
+              : null)
+          : existing.customClientLimit,
+      settings: newSettings,
+    })
+    .where(eq(businesses.id, businessId));
+
+  await recordAuditLog({
+    userId: session.id,
+    action: "business.custom_plan_configured",
+    entityType: "business",
+    entityId: businessId,
+    details: config,
+  });
+
   refresh();
   return { ok: true };
 }
@@ -256,7 +404,15 @@ export async function approveSubscriptionAction(subscriptionId: string): Promise
       active?.currentPeriodEnd && active.currentPeriodEnd.getTime() > now.getTime()
         ? active.currentPeriodEnd
         : now;
-    const periodEnd = new Date(base.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const requestedDurationMs = subscription.currentPeriodEnd
+      ? Math.max(
+          30 * 24 * 60 * 60 * 1000,
+          subscription.currentPeriodEnd.getTime() - subscription.createdAt.getTime(),
+        )
+      : 30 * 24 * 60 * 60 * 1000;
+    const monthsCount = Math.max(1, Math.round(requestedDurationMs / (30 * 24 * 60 * 60 * 1000)));
+    const periodEnd = new Date(base.getTime() + monthsCount * 30 * 24 * 60 * 60 * 1000);
 
     await tx
       .update(subscriptions)

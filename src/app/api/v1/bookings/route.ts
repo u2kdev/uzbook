@@ -50,6 +50,18 @@ export async function POST(request: Request) {
       return apiError("not_found", "Салон не найден или неактивен", 404);
     }
 
+    const isTrialExpired =
+      business.plan === "TRIAL" &&
+      Boolean(business.trialEndsAt) &&
+      (business.trialEndsAt as Date).getTime() < Date.now();
+    if (isTrialExpired) {
+      return apiError(
+        "trial_expired",
+        "Бесплатный период салона истёк. Страница онлайн-записи временно отключена.",
+        403,
+      );
+    }
+
     const result = await createBooking({
       business,
       staffId,

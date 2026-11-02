@@ -5,7 +5,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { getDb } from "@/server/db";
 import { businesses, payments, subscriptions, users } from "@/server/db/schema";
 import { requireUser } from "@/server/auth/session";
-import { planById, type PlanId } from "@/lib/plans";
+import { planById, type BillingPeriodMonths, type PlanId } from "@/lib/plans";
 import {
   availableProviders,
   demoPaymentsEnabled,
@@ -52,6 +52,7 @@ function refreshBilling(slug?: string) {
 export async function startPaymentAction(
   plan: PlanId,
   provider: PaymentProviderId,
+  months?: BillingPeriodMonths,
 ): Promise<PaymentActionState> {
   const { business } = await ownerBusiness();
   if (!business) return { error: "Сначала создайте бизнес" };
@@ -72,8 +73,16 @@ export async function startPaymentAction(
   const current = planById(plan);
   if (current.priceUzs <= 0) return { error: "У этого тарифа нет цены" };
 
+  const validMonths: BillingPeriodMonths =
+    months && [1, 3, 6, 12].includes(months) ? months : 1;
+
   try {
-    const { url } = await createPayment({ business, plan, provider });
+    const { url } = await createPayment({
+      business,
+      plan,
+      provider,
+      months: validMonths,
+    });
     refreshBilling(business.slug);
     return { ok: true, url };
   } catch (error) {
@@ -207,6 +216,12 @@ export async function confirmCryptoPaymentAction(
         and(eq(subscriptions.businessId, business.id), eq(subscriptions.status, "PENDING")),
       );
 
+    const paymentPayload = (row.payment.payload ?? {}) as Record<string, unknown>;
+    const rawMonths = Number(paymentPayload.months) || 1;
+    const months = ([1, 3, 6, 12].includes(rawMonths) ? rawMonths : 1) as BillingPeriodMonths;
+    const periodDurationMs = months * 30 * 24 * 60 * 60 * 1000;
+    const periodText = months === 1 ? "1 месяц" : months === 12 ? "1 год" : `${months} месяца`;
+
     await tx.insert(subscriptions).values({
       businessId: business.id,
       providerId: business.providerId ?? null,
@@ -219,8 +234,8 @@ export async function confirmCryptoPaymentAction(
       customClientLimit: business.customClientLimit ?? null,
       providerCommissionPercent,
       providerPayoutAmount,
-      note: `Крипто-оплата · Заказ ${row.payment.externalId.slice(0, 8)} · TXID: ${cleanHash}`,
-      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      note: `Крипто-оплата (${periodText}) · Заказ ${row.payment.externalId.slice(0, 8)} · TXID: ${cleanHash}`,
+      currentPeriodEnd: new Date(Date.now() + periodDurationMs),
     });
   });
 

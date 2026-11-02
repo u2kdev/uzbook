@@ -54,6 +54,8 @@ export default async function AdminBusinessesPage({
           customStaffLimit: business.customStaffLimit ?? null,
           customClientLimit: business.customClientLimit ?? null,
           customPriceUzs: business.customPriceUzs ?? null,
+          customPlanName: business.settings?.customPlanName ?? null,
+          discountPercent: business.settings?.discountPercent ?? null,
           pendingPlan: pending?.plan ?? null,
         }))}
       />

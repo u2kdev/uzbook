@@ -202,6 +202,8 @@ export default async function BillingPage() {
         customPriceUzs={business.customPriceUzs}
         customStaffLimit={business.customStaffLimit}
         customClientLimit={business.customClientLimit}
+        customPlanName={business.settings?.customPlanName ?? null}
+        discountPercent={business.settings?.discountPercent ?? null}
       />
 
       <div className="rounded-[24px] bg-white p-5 ring-1 ring-line/80">

@@ -66,9 +66,12 @@ export async function getAdminBusinesses(): Promise<AdminBusinessRow[]> {
 
 export type PendingRequestRow = {
   subscription: Subscription;
+  businessId: string;
   businessName: string;
   businessSlug: string;
   businessStatus: Business["status"];
+  businessPhone: string | null;
+  contactPhone: string | null;
   ownerName: string;
   ownerEmail: string;
   ownerPhone: string | null;
@@ -81,9 +84,11 @@ export async function getPendingRequests(): Promise<PendingRequestRow[]> {
   const rows = await db
     .select({
       subscription: subscriptions,
+      businessId: businesses.id,
       businessName: businesses.name,
       businessSlug: businesses.slug,
       businessStatus: businesses.status,
+      businessPhone: businesses.phone,
       ownerName: users.name,
       ownerEmail: users.email,
       ownerPhone: users.phone,
@@ -104,6 +109,7 @@ export async function getPendingRequests(): Promise<PendingRequestRow[]> {
     const prov = r.subscription.providerId ? provMap.get(r.subscription.providerId) : null;
     return {
       ...r,
+      contactPhone: r.ownerPhone || r.businessPhone || null,
       providerName: prov?.name ?? null,
       providerPayoutCard: prov?.payoutCard ?? null,
     };

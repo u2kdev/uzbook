@@ -3,11 +3,13 @@
 import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Calendar,
   Check,
   CreditCard,
   Handshake,
   KeyRound,
   Percent,
+  Phone,
   Plus,
   Settings2,
   UserPlus,
@@ -90,8 +92,9 @@ export function ProviderManager({
     <div className="space-y-6">
       {/* Status Banner */}
       {(createState?.message || updateState?.message) && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] font-medium text-emerald-950">
-          ✅ {createState?.message || updateState?.message}
+        <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] font-medium text-emerald-950">
+          <Check size={16} className="text-emerald-700" />
+          <span>{createState?.message || updateState?.message}</span>
         </div>
       )}
 
@@ -298,12 +301,32 @@ export function ProviderManager({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-[14.5px] font-semibold">{app.fullName}</p>
-                    <p className="mt-0.5 text-[12px] text-muted">
-                      📞 {app.phone}
-                      {app.telegram ? ` · TG: ${app.telegram}` : ""}
-                      {app.city ? ` · ${app.city}` : ""}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[14.5px] font-semibold text-ink">{app.fullName}</p>
+                      <span className="rounded-md bg-paper px-2 py-0.5 font-mono text-[10.5px] text-muted">
+                        ID: {app.id.slice(0, 8)}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted">
+                      <span className="inline-flex items-center gap-1 text-ink-soft">
+                        <Phone size={12} className="text-muted" />
+                        <a href={`tel:${app.phone}`} className="font-semibold text-brand hover:underline">
+                          {app.phone}
+                        </a>
+                      </span>
+                      {app.telegram && <span>TG: {app.telegram}</span>}
+                      {app.city && <span>{app.city}</span>}
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar size={12} className="text-muted" />
+                        {new Intl.DateTimeFormat("ru-RU", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }).format(new Date(app.createdAt))}
+                      </span>
+                    </div>
                   </div>
                   <span className="rounded-full bg-amber/15 px-2.5 py-0.5 text-[10px] font-semibold text-amber">
                     Ожидает решения
@@ -311,8 +334,9 @@ export function ProviderManager({
                 </div>
 
                 {app.payoutCard && (
-                  <p className="mt-2 text-[11.5px] text-ink-soft">
-                    💳 Карта: <span className="font-mono">{app.payoutCard}</span>
+                  <p className="mt-2 inline-flex items-center gap-1.5 text-[11.5px] text-ink-soft">
+                    <CreditCard size={12} className="text-muted" />
+                    Карта: <span className="font-mono">{app.payoutCard}</span>
                   </p>
                 )}
                 {app.experienceNote && (
@@ -387,12 +411,22 @@ export function ProviderManager({
                         </span>
                       </div>
 
-                      <p className="mt-1 text-[12px] text-muted">
-                        {prov.phone ? `📞 ${prov.phone} · ` : ""}
-                        💳 Карта для выплат:{" "}
-                        <b className="font-mono text-ink">
-                          {prov.payoutCard || "не указана"}
-                        </b>
+                      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted">
+                        {prov.phone ? (
+                          <span className="inline-flex items-center gap-1 text-ink-soft">
+                            <Phone size={12} className="text-muted" />
+                            <a href={`tel:${prov.phone}`} className="hover:underline">
+                              {prov.phone}
+                            </a>
+                          </span>
+                        ) : null}
+                        <span className="inline-flex items-center gap-1">
+                          <CreditCard size={12} className="text-muted" />
+                          Карта для выплат:{" "}
+                          <b className="font-mono text-ink">
+                            {prov.payoutCard || "не указана"}
+                          </b>
+                        </span>
                       </p>
 
                       <div className="mt-3 flex flex-wrap gap-2 text-[11.5px]">

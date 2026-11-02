@@ -10,7 +10,9 @@ import {
   FlaskConical,
   Landmark,
   Loader2,
+  Percent,
   Send,
+  Sparkles,
   X,
 } from "lucide-react";
 import {
@@ -18,7 +20,14 @@ import {
   requestPlanAction,
 } from "@/server/actions/profile";
 import { startPaymentAction, type PaymentActionState } from "@/server/actions/payments";
-import { PLANS, formatMoney, type PlanId } from "@/lib/plans";
+import {
+  BILLING_PERIODS,
+  calculatePlanPrice,
+  formatMoney,
+  PLANS,
+  type BillingPeriodMonths,
+  type PlanId,
+} from "@/lib/plans";
 
 type ProviderId = "PAYME" | "CLICK" | "DEMO" | "MANUAL" | "CRYPTO";
 
@@ -46,6 +55,8 @@ export function BillingPlans({
   customPriceUzs,
   customStaffLimit,
   customClientLimit,
+  customPlanName,
+  discountPercent,
 }: {
   currentPlan: PlanId;
   pendingPlan: PlanId | null;
@@ -55,9 +66,12 @@ export function BillingPlans({
   customPriceUzs?: number | null;
   customStaffLimit?: number | null;
   customClientLimit?: number | null;
+  customPlanName?: string | null;
+  discountPercent?: number | null;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<PlanId | null>(null);
+  const [selectedMonths, setSelectedMonths] = useState<BillingPeriodMonths>(1);
   const [busyProvider, setBusyProvider] = useState<ProviderId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -66,13 +80,25 @@ export function BillingPlans({
 
   const hasCustomPrice =
     customPriceUzs !== null && customPriceUzs !== undefined && customPriceUzs > 0;
+  const hasAdminDiscount =
+    discountPercent !== null && discountPercent !== undefined && discountPercent > 0;
 
-  function effectivePrice(plan: (typeof PLANS)[number]): number {
+  function basePrice(plan: (typeof PLANS)[number]): number {
     if (plan.id === "TRIAL") return 0;
     return hasCustomPrice ? customPriceUzs! : plan.priceUzs;
   }
 
+  function planPricing(plan: (typeof PLANS)[number], months: BillingPeriodMonths) {
+    const base = basePrice(plan);
+    return calculatePlanPrice({
+      baseMonthlyPrice: base,
+      months,
+      customDiscountPercent: discountPercent ?? 0,
+    });
+  }
+
   const selectedPlan = selected ? PLANS.find((plan) => plan.id === selected) ?? null : null;
+  const activePricing = selectedPlan ? planPricing(selectedPlan, selectedMonths) : null;
 
   function close() {
     if (pending) return;
@@ -90,6 +116,7 @@ export function BillingPlans({
       startTransition(async () => {
         const formData = new FormData();
         formData.set("plan", selected);
+        formData.set("months", String(selectedMonths));
         const result = await requestPlanAction(null, formData);
         setBusyProvider(null);
         if (result?.error) {
@@ -97,7 +124,9 @@ export function BillingPlans({
           return;
         }
         setSelected(null);
-        setNotice("Заявка отправлена. Администратор подтвердит оплату и включит тариф.");
+        setNotice(
+          `Заявка на ${selectedMonths} мес. отправлена. Администратор подтвердит оплату и включит тариф.`,
+        );
         router.refresh();
       });
       return;
@@ -108,6 +137,7 @@ export function BillingPlans({
       const result: PaymentActionState = await startPaymentAction(
         selected,
         provider.id as Exclude<ProviderId, "MANUAL">,
+        selectedMonths,
       );
       if (result?.error || !result?.url) {
         setBusyProvider(null);
@@ -131,12 +161,31 @@ export function BillingPlans({
         </div>
       )}
 
-      {(hasCustomPrice || customStaffLimit || customClientLimit) && (
+      {hasAdminDiscount && (
+        <div className="flex items-center gap-3 rounded-2xl border border-mint/30 bg-mint/10 p-3.5 text-[12.5px] text-ink">
+          <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-mint text-white">
+            <Percent size={15} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-mint">
+              Персональная скидка {discountPercent}% от платформы
+            </p>
+            <p className="mt-0.5 text-[11.5px] text-ink-soft">
+              Для вашего бизнеса действует персональная скидка {discountPercent}%. При оплате на 3, 6 или 12 месяцев
+              скидка суммируется со скидкой за период!
+            </p>
+          </div>
+        </div>
+      )}
+
+      {(hasCustomPrice || customStaffLimit || customClientLimit || customPlanName) && (
         <div className="rounded-2xl border border-brand/25 bg-brand-soft/40 px-4 py-3 text-[12px] leading-relaxed text-ink-soft">
-          <span className="font-semibold text-ink">Индивидуальные условия провайдера:</span>{" "}
+          <span className="font-semibold text-ink">
+            {customPlanName ? `Специальный тариф «${customPlanName}»:` : "Индивидуальные условия:"}
+          </span>{" "}
           {hasCustomPrice && (
             <span>
-              специальная стоимость подписки <b>{formatMoney(customPriceUzs!, currency)} / мес</b>
+              базовая стоимость <b>{formatMoney(customPriceUzs!, currency)} / мес</b>
             </span>
           )}
           {customStaffLimit ? (
@@ -152,11 +201,49 @@ export function BillingPlans({
         </div>
       )}
 
+      {/* DURATION SELECTOR TABS */}
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+        <div>
+          <h2 className="text-[15px] font-semibold text-ink">Выберите период оплаты</h2>
+          <p className="text-[11.5px] text-muted">
+            Оплата на длительный срок выгоднее — скидка применяется ко всей стоимости.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 rounded-full border border-line bg-white p-1">
+          {BILLING_PERIODS.map((bp) => (
+            <button
+              key={bp.months}
+              type="button"
+              onClick={() => setSelectedMonths(bp.months)}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-medium transition ${
+                selectedMonths === bp.months
+                  ? "bg-ink text-white shadow-sm"
+                  : "text-muted hover:text-ink"
+              }`}
+            >
+              <span>{bp.label}</span>
+              {bp.badge && (
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[9px] font-bold ${
+                    selectedMonths === bp.months
+                      ? "bg-white/25 text-white"
+                      : "bg-mint/15 text-mint"
+                  }`}
+                >
+                  {bp.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {PLANS.map((plan) => {
           const isCurrent = plan.id === currentPlan;
           const isPending = plan.id === pendingPlan;
-          const planPrice = effectivePrice(plan);
+          const pricing = planPricing(plan, selectedMonths);
 
           return (
             <div
@@ -196,17 +283,36 @@ export function BillingPlans({
                   {plan.tagline}
                 </p>
 
-                <div className="mt-4 flex items-end gap-1.5">
-                  <span className="text-[24px] leading-none font-semibold tracking-tight">
-                    {planPrice === 0 ? "0" : formatMoney(planPrice, currency)}
-                  </span>
-                  <span
-                    className={`pb-0.5 text-[11px] ${
-                      plan.highlighted ? "text-white/50" : "text-muted"
-                    }`}
-                  >
-                    {plan.period}
-                  </span>
+                <div className="mt-4 flex flex-col gap-0.5">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-[24px] leading-none font-semibold tracking-tight">
+                      {pricing.totalAmountUzs === 0
+                        ? "0"
+                        : formatMoney(pricing.totalAmountUzs, currency)}
+                    </span>
+                    <span
+                      className={`text-[11px] ${
+                        plan.highlighted ? "text-white/50" : "text-muted"
+                      }`}
+                    >
+                      {plan.id === "TRIAL"
+                        ? "14 дней"
+                        : `за ${selectedMonths === 1 ? "1 месяц" : selectedMonths === 12 ? "1 год" : `${selectedMonths} мес`}`}
+                    </span>
+                  </div>
+
+                  {plan.id !== "TRIAL" && (
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px]">
+                      <span className={plan.highlighted ? "text-white/60" : "text-muted"}>
+                        {formatMoney(pricing.pricePerMonthUzs, currency)} / мес
+                      </span>
+                      {pricing.discountPercent > 0 && (
+                        <span className="rounded-full bg-mint/20 px-1.5 py-0.2 text-[9.5px] font-bold text-mint">
+                          -{pricing.discountPercent}%
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <ul className="mt-4 flex-1 space-y-1.5">
@@ -282,7 +388,8 @@ export function BillingPlans({
         </div>
       )}
 
-      {selectedPlan && (
+      {/* PAYMENT MODAL */}
+      {selectedPlan && activePricing && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 backdrop-blur-sm sm:items-center">
           <div className="w-full max-w-md overflow-hidden rounded-[26px] bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-line/70 px-5 py-4">
@@ -290,10 +397,13 @@ export function BillingPlans({
                 <p className="text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">
                   Оплата тарифа
                 </p>
-                <h3 className="mt-1 text-[19px] font-semibold tracking-[-0.02em]">
-                  {selectedPlan.name} · {formatMoney(effectivePrice(selectedPlan), currency)}
+                <h3 className="mt-1 text-[19px] font-semibold tracking-[-0.02em] text-ink">
+                  {customPlanName || selectedPlan.name} · {formatMoney(activePricing.totalAmountUzs, currency)}
                 </h3>
-                <p className="mt-0.5 text-[11.5px] text-muted">Доступ на 30 дней</p>
+                <p className="mt-0.5 text-[11.5px] text-muted">
+                  Период: {selectedMonths === 1 ? "1 месяц (30 дней)" : selectedMonths === 12 ? "12 месяцев (1 год)" : `${selectedMonths} месяцев`}
+                  {activePricing.discountPercent > 0 && ` · Скидка: ${activePricing.discountPercent}%`}
+                </p>
               </div>
               <button
                 type="button"
@@ -307,6 +417,38 @@ export function BillingPlans({
             </div>
 
             <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+              {/* Change duration directly in modal */}
+              <div className="mb-4">
+                <label className="label-base">Период подписки</label>
+                <div className="mt-1.5 grid grid-cols-4 gap-1.5">
+                  {BILLING_PERIODS.map((bp) => (
+                    <button
+                      key={bp.months}
+                      type="button"
+                      onClick={() => setSelectedMonths(bp.months)}
+                      className={`flex flex-col items-center justify-center rounded-xl border p-2 text-center transition ${
+                        selectedMonths === bp.months
+                          ? "border-ink bg-ink text-white"
+                          : "border-line bg-paper/50 text-ink hover:bg-paper"
+                      }`}
+                    >
+                      <span className="text-[11px] font-semibold">{bp.label.split(" ")[0]} мес</span>
+                      {bp.badge && (
+                        <span
+                          className={`mt-0.5 rounded-full px-1.5 py-0.2 text-[8.5px] font-bold ${
+                            selectedMonths === bp.months
+                              ? "bg-white/20 text-white"
+                              : "bg-mint/15 text-mint"
+                          }`}
+                        >
+                          {bp.badge}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <p className="text-[11.5px] text-muted">Выберите способ оплаты</p>
               <div className="mt-2.5 space-y-2">
                 {providers.map((provider) => {
@@ -360,8 +502,8 @@ export function BillingPlans({
               )}
 
               <p className="mt-3 text-center text-[10.5px] leading-relaxed text-muted">
-                Онлайн-платёж включает тариф автоматически. При продлении 30 дней
-                добавятся к текущему оплаченному периоду.
+                Онлайн-платёж включает тариф автоматически на {selectedMonths * 30} дней. При продлении срок
+                добавляется к текущему оплаченному периоду.
               </p>
             </div>
           </div>

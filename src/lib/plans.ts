@@ -92,6 +92,52 @@ export function planById(id: PlanId): Plan {
   return PLANS.find((p) => p.id === id) ?? PLANS[0];
 }
 
+export type BillingPeriodMonths = 1 | 3 | 6 | 12;
+
+export type BillingPeriodOption = {
+  months: BillingPeriodMonths;
+  label: string;
+  discountPercent: number;
+  badge?: string;
+};
+
+export const BILLING_PERIODS: BillingPeriodOption[] = [
+  { months: 1, label: "1 месяц", discountPercent: 0 },
+  { months: 3, label: "3 месяца", discountPercent: 10, badge: "-10%" },
+  { months: 6, label: "6 месяцев", discountPercent: 15, badge: "-15%" },
+  { months: 12, label: "12 месяцев (1 год)", discountPercent: 25, badge: "-25%" },
+];
+
+export function calculatePlanPrice({
+  baseMonthlyPrice,
+  months,
+  customDiscountPercent = 0,
+}: {
+  baseMonthlyPrice: number;
+  months: BillingPeriodMonths;
+  customDiscountPercent?: number | null;
+}) {
+  const periodOption = BILLING_PERIODS.find((p) => p.months === months) ?? BILLING_PERIODS[0];
+  const combinedDiscount = Math.min(
+    90,
+    Math.max(0, periodOption.discountPercent + (customDiscountPercent ?? 0)),
+  );
+  const rawTotal = baseMonthlyPrice * months;
+  const totalAmountUzs = Math.round(rawTotal * (1 - combinedDiscount / 100));
+  const savingsUzs = Math.max(0, rawTotal - totalAmountUzs);
+  const pricePerMonthUzs = Math.round(totalAmountUzs / months);
+
+  return {
+    months,
+    monthlyPrice: baseMonthlyPrice,
+    rawTotal,
+    discountPercent: combinedDiscount,
+    totalAmountUzs,
+    savingsUzs,
+    pricePerMonthUzs,
+  };
+}
+
 export function formatMoney(amount: number, currency = "UZS"): string {
   return new Intl.NumberFormat("ru-RU", {
     style: "currency",

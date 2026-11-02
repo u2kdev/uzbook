@@ -52,6 +52,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         trialEndsAt: currentBusiness.trialEndsAt?.toISOString() ?? null,
         trialDaysLeft,
         trialExpired,
+        discountPercent: currentBusiness.settings?.discountPercent ?? null,
+        customPlanName: currentBusiness.settings?.customPlanName ?? null,
       }}
     >
       {children}

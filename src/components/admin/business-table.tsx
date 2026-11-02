@@ -6,18 +6,33 @@ import Link from "next/link";
 import {
   ArrowUpRight,
   Check,
+  CreditCard,
   Loader2,
   Pause,
+  Percent,
+  Phone,
   Play,
   Search,
+  SlidersHorizontal,
   TimerReset,
+  Users,
+  X,
 } from "lucide-react";
 import {
   extendTrialAction,
   setBusinessPlanAction,
   setBusinessStatusAction,
+  updateBusinessCustomPlanConfigAction,
 } from "@/server/actions/admin";
-import { PLANS, planById, type PlanId } from "@/lib/plans";
+import {
+  BILLING_PERIODS,
+  calculatePlanPrice,
+  formatMoney,
+  PLANS,
+  planById,
+  type BillingPeriodMonths,
+  type PlanId,
+} from "@/lib/plans";
 
 export type AdminBusinessItem = {
   id: string;
@@ -34,6 +49,8 @@ export type AdminBusinessItem = {
   customStaffLimit?: number | null;
   customClientLimit?: number | null;
   customPriceUzs?: number | null;
+  customPlanName?: string | null;
+  discountPercent?: number | null;
   pendingPlan: PlanId | null;
 };
 
@@ -63,6 +80,35 @@ export function BusinessTable({
   const [filter, setFilter] = useState<"all" | "ACTIVE" | "SUSPENDED">("all");
   const [pending, startTransition] = useTransition();
 
+  // Custom Plan Modal state
+  const [configBusiness, setConfigBusiness] = useState<AdminBusinessItem | null>(null);
+  const [modalPlan, setModalPlan] = useState<PlanId>("PRO");
+  const [customPlanName, setCustomPlanName] = useState("");
+  const [customPriceUzs, setCustomPriceUzs] = useState<string>("");
+  const [discountPercent, setDiscountPercent] = useState<string>("0");
+  const [customStaffLimit, setCustomStaffLimit] = useState<string>("");
+  const [customClientLimit, setCustomClientLimit] = useState<string>("");
+  const [billingMonths, setBillingMonths] = useState<BillingPeriodMonths>(1);
+  const [modalMessage, setModalMessage] = useState<string | null>(null);
+
+  function openConfig(b: AdminBusinessItem) {
+    setConfigBusiness(b);
+    setModalPlan(b.plan);
+    setCustomPlanName(b.customPlanName ?? "");
+    setCustomPriceUzs(b.customPriceUzs ? String(b.customPriceUzs) : "");
+    setDiscountPercent(b.discountPercent ? String(b.discountPercent) : "0");
+    setCustomStaffLimit(b.customStaffLimit ? String(b.customStaffLimit) : "");
+    setCustomClientLimit(b.customClientLimit ? String(b.customClientLimit) : "");
+    setBillingMonths(1);
+    setModalMessage(null);
+  }
+
+  function closeConfig() {
+    if (pending) return;
+    setConfigBusiness(null);
+    setModalMessage(null);
+  }
+
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
     return rows.filter((row) => {
@@ -84,6 +130,18 @@ export function BusinessTable({
       router.refresh();
     });
   }
+
+  // Real-time calculation for modal
+  const baseMonthlyPrice =
+    customPriceUzs && Number(customPriceUzs) > 0
+      ? Number(customPriceUzs)
+      : planById(modalPlan).priceUzs;
+
+  const currentPricing = calculatePlanPrice({
+    baseMonthlyPrice,
+    months: billingMonths,
+    customDiscountPercent: Number(discountPercent) || 0,
+  });
 
   return (
     <div className="space-y-4">
@@ -146,8 +204,18 @@ export function BusinessTable({
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <p className="truncate text-[13px] font-semibold">{row.name}</p>
+                    <p className="truncate text-[13px] font-semibold text-ink">{row.name}</p>
                     <span className="text-[10.5px] text-muted">/{row.slug}</span>
+                    {row.customPlanName && (
+                      <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[9px] font-semibold text-brand-dark">
+                        {row.customPlanName}
+                      </span>
+                    )}
+                    {row.discountPercent != null && row.discountPercent > 0 && (
+                      <span className="rounded-full bg-mint/10 px-1.5 py-0.5 text-[9px] font-semibold text-mint">
+                        -{row.discountPercent}% скидка
+                      </span>
+                    )}
                     {row.pendingPlan && (
                       <span className="rounded-full bg-amber/10 px-1.5 py-0.5 text-[9px] font-semibold text-amber">
                         заявка · {planById(row.pendingPlan).name}
@@ -156,10 +224,11 @@ export function BusinessTable({
                   </div>
                   <p className="mt-0.5 truncate text-[11px] text-muted">
                     {row.ownerName} · {row.ownerEmail}
-                    {row.ownerPhone ? ` · 📞 ${row.ownerPhone}` : ""}
-                    {row.providerName ? ` · 🤝 Провайдер: ${row.providerName}` : ""}
+                    {row.ownerPhone ? ` · тел: ${row.ownerPhone}` : ""}
+                    {row.providerName ? ` · провайдер: ${row.providerName}` : ""}
                     {row.customStaffLimit ? ` · до ${row.customStaffLimit} сотр.` : ""}
                     {row.customClientLimit ? ` · до ${row.customClientLimit} кл.` : ""}
+                    {row.customPriceUzs ? ` · ${formatMoney(row.customPriceUzs)}/мес` : ""}
                   </p>
                 </div>
 
@@ -214,6 +283,15 @@ export function BusinessTable({
                   {canManage && (
                     <>
                       <button
+                        onClick={() => openConfig(row)}
+                        disabled={pending}
+                        className="grid size-8 place-items-center rounded-lg text-muted hover:bg-paper hover:text-ink"
+                        title="Настроить тариф, скидку и лимиты"
+                      >
+                        <SlidersHorizontal size={14} />
+                      </button>
+
+                      <button
                         onClick={() => run(() => extendTrialAction(row.id, 7))}
                         disabled={pending}
                         className="grid size-8 place-items-center rounded-lg text-muted hover:bg-paper hover:text-ink"
@@ -265,6 +343,246 @@ export function BusinessTable({
         Показано {filtered.length} из {rows.length}. Тариф меняется сразу, блокировка скрывает
         страницу записи.
       </p>
+
+      {/* CUSTOM PLAN & DISCOUNT CONFIGURATION MODAL */}
+      {configBusiness && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-3 backdrop-blur-sm">
+          <div className="w-full max-w-lg overflow-hidden rounded-[26px] bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-line px-5 py-4">
+              <div>
+                <span className="badge">
+                  <SlidersHorizontal size={12} /> Настройка тарифа и скидок
+                </span>
+                <h3 className="mt-1 text-[17px] font-semibold text-ink">
+                  {configBusiness.name}
+                  <span className="ml-2 font-normal text-[12px] text-muted">
+                    /{configBusiness.slug}
+                  </span>
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={closeConfig}
+                disabled={pending}
+                className="grid size-8 place-items-center rounded-full bg-paper text-muted hover:text-ink disabled:opacity-50"
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="max-h-[75vh] space-y-4 overflow-y-auto px-5 py-4">
+              {modalMessage && (
+                <div className="rounded-xl border border-mint/20 bg-mint/5 px-3.5 py-2.5 text-[12.5px] font-medium text-mint">
+                  {modalMessage}
+                </div>
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label-base">Базовый тариф</label>
+                  <select
+                    value={modalPlan}
+                    onChange={(e) => setModalPlan(e.target.value as PlanId)}
+                    className="input-base"
+                  >
+                    {PLANS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({formatMoney(p.priceUzs)}/мес)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="label-base">Кастомное имя тарифа</label>
+                  <input
+                    value={customPlanName}
+                    onChange={(e) => setCustomPlanName(e.target.value)}
+                    placeholder="Например: VIP Индивидуальный"
+                    className="input-base"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label-base">Базовая цена в месяц (UZS)</label>
+                  <input
+                    type="number"
+                    value={customPriceUzs}
+                    onChange={(e) => setCustomPriceUzs(e.target.value)}
+                    placeholder={`По умолчанию: ${planById(modalPlan).priceUzs}`}
+                    className="input-base font-mono"
+                  />
+                  <span className="mt-0.5 block text-[10.5px] text-muted">
+                    Оставьте пустым для стандартной цены тарифа
+                  </span>
+                </div>
+
+                <div>
+                  <label className="label-base">Скидка администратора (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={90}
+                    value={discountPercent}
+                    onChange={(e) => setDiscountPercent(e.target.value)}
+                    placeholder="0"
+                    className="input-base font-semibold text-brand"
+                  />
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {[0, 10, 15, 20, 30, 50].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => setDiscountPercent(String(pct))}
+                        className={`rounded-md border px-2 py-0.5 text-[10.5px] font-semibold ${
+                          Number(discountPercent) === pct
+                            ? "border-brand bg-brand-soft text-brand-dark"
+                            : "border-line text-muted hover:text-ink"
+                        }`}
+                      >
+                        {pct === 0 ? "0%" : `-${pct}%`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label-base">Лимит мастеров</label>
+                  <input
+                    type="number"
+                    value={customStaffLimit}
+                    onChange={(e) => setCustomStaffLimit(e.target.value)}
+                    placeholder={`По тарифу: ${planById(modalPlan).staffLimit}`}
+                    className="input-base"
+                  />
+                </div>
+
+                <div>
+                  <label className="label-base">Лимит клиентов</label>
+                  <input
+                    type="number"
+                    value={customClientLimit}
+                    onChange={(e) => setCustomClientLimit(e.target.value)}
+                    placeholder="Без ограничений"
+                    className="input-base"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="label-base">Срок оплаты (1, 3, 6 или 12 месяцев)</label>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {BILLING_PERIODS.map((bp) => (
+                    <button
+                      key={bp.months}
+                      type="button"
+                      onClick={() => setBillingMonths(bp.months)}
+                      className={`flex flex-col items-center justify-center rounded-xl border p-2 text-center transition ${
+                        billingMonths === bp.months
+                          ? "border-ink bg-ink text-white"
+                          : "border-line bg-paper/50 text-ink hover:bg-paper"
+                      }`}
+                    >
+                      <span className="text-[12px] font-semibold">{bp.label}</span>
+                      {bp.badge && (
+                        <span
+                          className={`mt-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-bold ${
+                            billingMonths === bp.months
+                              ? "bg-white/20 text-white"
+                              : "bg-mint/15 text-mint"
+                          }`}
+                        >
+                          {bp.badge}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* LIVE CALCULATION SUMMARY */}
+              <div className="rounded-2xl border border-line bg-paper/60 p-3.5">
+                <div className="flex items-center justify-between text-[11.5px] text-muted">
+                  <span>Расчёт стоимости на выбранный период:</span>
+                  {currentPricing.discountPercent > 0 && (
+                    <span className="rounded-full bg-mint/15 px-2 py-0.5 text-[10px] font-bold text-mint">
+                      Итоговая скидка: -{currentPricing.discountPercent}%
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 flex items-baseline justify-between">
+                  <span className="text-[20px] font-bold tracking-tight text-ink">
+                    {formatMoney(currentPricing.totalAmountUzs)}
+                  </span>
+                  <span className="text-[12px] font-medium text-muted">
+                    {formatMoney(currentPricing.pricePerMonthUzs)} / месяц
+                  </span>
+                </div>
+                {currentPricing.savingsUzs > 0 && (
+                  <p className="mt-1 text-[11px] font-medium text-mint">
+                    Клиент сэкономит {formatMoney(currentPricing.savingsUzs)} при оплате на{" "}
+                    {billingMonths === 1 ? "1 месяц" : billingMonths === 12 ? "1 год" : `${billingMonths} мес`}.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line bg-paper/30 px-5 py-3.5">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  startTransition(async () => {
+                    await updateBusinessCustomPlanConfigAction(configBusiness.id, {
+                      customPlanName: customPlanName.trim() || null,
+                      customPriceUzs: customPriceUzs ? Number(customPriceUzs) : null,
+                      discountPercent: discountPercent ? Number(discountPercent) : null,
+                      customStaffLimit: customStaffLimit ? Number(customStaffLimit) : null,
+                      customClientLimit: customClientLimit ? Number(customClientLimit) : null,
+                    });
+                    setModalMessage("Параметры сохранены. Клиент увидит их при входе в «Тариф».");
+                    router.refresh();
+                  });
+                }}
+                className="btn btn-ghost h-9 px-3.5 text-[12px]"
+              >
+                Сохранить параметры
+              </button>
+
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  startTransition(async () => {
+                    await setBusinessPlanAction(configBusiness.id, modalPlan, {
+                      months: billingMonths,
+                      customPlanName: customPlanName.trim() || null,
+                      customPriceUzs: customPriceUzs ? Number(customPriceUzs) : null,
+                      discountPercent: discountPercent ? Number(discountPercent) : null,
+                      customStaffLimit: customStaffLimit ? Number(customStaffLimit) : null,
+                      customClientLimit: customClientLimit ? Number(customClientLimit) : null,
+                    });
+                    setConfigBusiness(null);
+                    router.refresh();
+                  });
+                }}
+                className="btn btn-primary h-9 px-4 text-[12px]"
+              >
+                {pending ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Check size={13} />
+                )}
+                Активировать подписку на {billingMonths} мес
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

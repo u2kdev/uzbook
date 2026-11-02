@@ -81,6 +81,8 @@ export type BusinessSettings = {
   autoConfirm: boolean;
   showPrices: boolean;
   requireEmail: boolean;
+  customPlanName?: string | null;
+  discountPercent?: number | null;
 };
 
 export type BusinessTheme = {
@@ -354,6 +356,9 @@ export const subscriptions = pgTable(
     index("subscriptions_business_idx").on(t.businessId),
     index("subscriptions_provider_idx").on(t.providerId),
     index("subscriptions_business_status_idx").on(t.businessId, t.status),
+    uniqueIndex("subscriptions_one_active_per_biz_uq")
+      .on(t.businessId)
+      .where(sql`${t.status} = 'ACTIVE'`),
   ],
 );
 

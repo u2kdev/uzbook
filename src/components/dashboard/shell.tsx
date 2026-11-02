@@ -54,6 +54,8 @@ export function DashboardShell({
     trialEndsAt: string | null;
     trialDaysLeft: number | null;
     trialExpired: boolean;
+    discountPercent?: number | null;
+    customPlanName?: string | null;
   };
 }) {
   const pathname = usePathname();
@@ -263,15 +265,15 @@ export function DashboardShell({
         <main className="flex-1 pb-20 sm:pb-8">
           <div className="mx-auto w-full max-w-[1240px] px-4 py-6 sm:px-6 lg:px-10 lg:py-9">
             {business.trialExpired && pathname !== "/dashboard/billing" && (
-              <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-rose/25 bg-rose/5 px-4 py-3">
-                <AlertTriangle size={16} strokeWidth={1.7} className="shrink-0 text-rose" />
-                <p className="flex-1 text-[12px] leading-relaxed text-rose">
-                  Пробный период закончился. Создание мастеров, услуг, фото и правки страницы
-                  заблокированы — записи клиентов продолжают работать.
+              <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-rose/25 bg-rose/5 px-4 py-3.5">
+                <AlertTriangle size={18} strokeWidth={1.8} className="shrink-0 text-rose" />
+                <p className="flex-1 text-[12.5px] leading-relaxed text-rose">
+                  Бесплатный период закончился. Ваша страница онлайн-записи /{business.slug} отключена
+                  для клиентов до выбора тарифа. Подключите подходящий тариф, чтобы вернуть приём записей.
                 </p>
                 <Link
                   href="/dashboard/billing"
-                  className="rounded-full bg-rose px-3 py-1.5 text-[11px] font-semibold text-white transition hover:opacity-90"
+                  className="rounded-full bg-rose px-3.5 py-1.5 text-[11.5px] font-semibold text-white transition hover:opacity-90"
                 >
                   Подключить тариф
                 </Link>
@@ -281,19 +283,40 @@ export function DashboardShell({
             {!business.trialExpired &&
               business.plan === "TRIAL" &&
               business.trialDaysLeft != null &&
-              business.trialDaysLeft <= 3 &&
+              business.trialDaysLeft <= 5 &&
               pathname !== "/dashboard/billing" && (
-                <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-amber/25 bg-amber/5 px-4 py-3">
-                  <AlertTriangle size={16} strokeWidth={1.7} className="shrink-0 text-amber" />
-                  <p className="flex-1 text-[12px] leading-relaxed text-ink-soft">
-                    Пробный период заканчивается через {business.trialDaysLeft} дн. Подключите
-                    тариф, чтобы не потерять доступ к редактированию.
+                <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-amber/25 bg-amber/5 px-4 py-3.5">
+                  <AlertTriangle size={18} strokeWidth={1.8} className="shrink-0 text-amber" />
+                  <p className="flex-1 text-[12.5px] leading-relaxed text-ink-soft">
+                    Бесплатный пробный период истекает через {business.trialDaysLeft}{" "}
+                    {business.trialDaysLeft === 1 ? "день" : business.trialDaysLeft < 5 ? "дня" : "дней"}.
+                    Подключите тариф заранее, чтобы ваша страница онлайн-записи /{business.slug} не была отключена для клиентов.
                   </p>
                   <Link
                     href="/dashboard/billing"
-                    className="rounded-full bg-ink px-3 py-1.5 text-[11px] font-semibold text-white transition hover:opacity-90"
+                    className="rounded-full bg-ink px-3.5 py-1.5 text-[11.5px] font-semibold text-white transition hover:opacity-90"
                   >
                     Выбрать тариф
+                  </Link>
+                </div>
+              )}
+
+            {business.discountPercent != null &&
+              business.discountPercent > 0 &&
+              pathname !== "/dashboard/billing" && (
+                <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-mint/25 bg-mint/5 px-4 py-3">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-mint text-white text-[10px] font-bold">
+                    %
+                  </span>
+                  <p className="flex-1 text-[12px] leading-relaxed text-ink-soft">
+                    Вам назначена персональная скидка <b>{business.discountPercent}%</b> от платформы!
+                    Скидка действует в разделе «Тариф и оплата» и суммируется со скидками при оплате на несколько месяцев.
+                  </p>
+                  <Link
+                    href="/dashboard/billing"
+                    className="rounded-full bg-mint px-3 py-1 text-[11px] font-semibold text-white transition hover:opacity-90"
+                  >
+                    Перейти к оплате
                   </Link>
                 </div>
               )}

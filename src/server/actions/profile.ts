@@ -13,7 +13,7 @@ import {
 } from "@/server/auth/session";
 import { normalizeAuthPhone } from "@/lib/phone";
 import { isValidSlug, slugify } from "@/lib/slug";
-import { planById, type PlanId } from "@/lib/plans";
+import { calculatePlanPrice, planById, type BillingPeriodMonths, type PlanId } from "@/lib/plans";
 import { recordAuditLog } from "@/server/payments/service";
 import { currentBusinessForOwner, writeBlockedReason } from "@/server/limits";
 
@@ -225,8 +225,25 @@ export async function requestPlanAction(
     return { error: "Выберите тариф" };
   }
 
+  const rawMonths = Number(formData.get("months") ?? 1);
+  const months = ([1, 3, 6, 12].includes(rawMonths) ? rawMonths : 1) as BillingPeriodMonths;
+
   const current = planById(plan);
-  const amount = business.customPriceUzs ?? current.priceUzs;
+  const baseMonthlyPrice = business.customPriceUzs ?? current.priceUzs;
+  const customDiscount = business.settings?.discountPercent ?? 0;
+  const pricing = calculatePlanPrice({
+    baseMonthlyPrice,
+    months,
+    customDiscountPercent: customDiscount,
+  });
+  const amount = pricing.totalAmountUzs;
+  const periodDurationMs = months * 30 * 24 * 60 * 60 * 1000;
+  const periodEnd = new Date(Date.now() + periodDurationMs);
+
+  const planDisplayName = business.settings?.customPlanName || current.name;
+  const periodText = months === 1 ? "1 месяц" : months === 12 ? "1 год" : `${months} месяца`;
+  const discountText = pricing.discountPercent > 0 ? ` (скидка ${pricing.discountPercent}%)` : "";
+  const note = `Заявка на тариф «${planDisplayName}» на ${periodText}${discountText}`;
 
   let providerCommissionPercent: number | null = null;
   let providerPayoutAmount: number | null = null;
@@ -260,8 +277,8 @@ export async function requestPlanAction(
       customClientLimit: business.customClientLimit ?? null,
       providerCommissionPercent,
       providerPayoutAmount,
-      note: "Заявка на подключение тарифа из кабинета",
-      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      note,
+      currentPeriodEnd: periodEnd,
     });
   });
 
@@ -274,6 +291,8 @@ export async function requestPlanAction(
       businessName: business.name,
       plan,
       amount,
+      months,
+      discountPercent: pricing.discountPercent,
       providerId: business.providerId,
       providerPayoutAmount,
     },

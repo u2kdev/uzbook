@@ -13,11 +13,21 @@ async function run() {
   console.log("==========================================");
 
   const db = await getDb();
-  const [b] = await db
+  const allBiz = await db
     .select()
     .from(businesses)
-    .where(and(eq(businesses.status, "ACTIVE"), gt(businesses.trialEndsAt, new Date())))
-    .limit(1);
+    .where(and(eq(businesses.status, "ACTIVE"), gt(businesses.trialEndsAt, new Date())));
+
+  let b = null;
+  for (const candidate of allBiz) {
+    const [hasStaff] = await db.select().from(staff).where(eq(staff.businessId, candidate.id)).limit(1);
+    const [hasSvc] = await db.select().from(services).where(eq(services.businessId, candidate.id)).limit(1);
+    if (hasStaff && hasSvc) {
+      b = candidate;
+      break;
+    }
+  }
+  if (!b) b = allBiz[0];
   if (!b) throw new Error("No active business found");
 
   const [u] = await db.select().from(users).where(eq(users.id, b.ownerId)).limit(1);

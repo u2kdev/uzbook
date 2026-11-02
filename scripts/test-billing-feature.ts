@@ -1,6 +1,6 @@
 import { getDb } from "../src/server/db";
 import { businesses, subscriptions } from "../src/server/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { PLANS, planById, formatMoney } from "../src/lib/plans";
 import { getUsage, getSubscriptionInfo } from "../src/server/limits";
 
@@ -36,6 +36,11 @@ async function run() {
 
   // 4. Test Subscription History insertion
   console.log("4. Проверка фиксации истории подписок...");
+  await db
+    .update(subscriptions)
+    .set({ status: "CANCELLED" })
+    .where(and(eq(subscriptions.businessId, b.id), eq(subscriptions.status, "ACTIVE")));
+
   const [subRow] = await db
     .insert(subscriptions)
     .values({

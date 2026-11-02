@@ -54,6 +54,7 @@ export default async function AdminRequestsPage() {
           canManage={session.role === "ADMIN"}
           requests={requests.map((row) => ({
             id: row.subscription.id,
+            businessId: row.businessId,
             plan: row.subscription.plan,
             provider: row.subscription.provider,
             note: row.subscription.note,
@@ -62,6 +63,7 @@ export default async function AdminRequestsPage() {
             ownerName: row.ownerName,
             ownerEmail: row.ownerEmail,
             ownerPhone: row.ownerPhone,
+            contactPhone: row.contactPhone,
             amount: row.subscription.amount,
             currency: row.subscription.currency,
             createdAt: row.subscription.createdAt.toISOString(),

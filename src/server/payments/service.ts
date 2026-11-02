@@ -12,8 +12,10 @@ import {
 } from "@/server/db/schema";
 import {
   planById,
+  calculatePlanPrice,
   SUBSCRIPTION_PERIOD_DAYS,
   SUBSCRIPTION_PERIOD_MS,
+  type BillingPeriodMonths,
   type PlanId,
 } from "@/lib/plans";
 import {
@@ -47,36 +49,51 @@ export async function createPayment(params: {
   business: Business;
   plan: PlanId;
   provider: PaymentProviderId;
+  months?: BillingPeriodMonths;
 }): Promise<{ payment: Payment; url: string }> {
   const { business, provider } = params;
   if (!["START", "PRO", "BUSINESS"].includes(params.plan)) {
     throw new Error("Этот тариф нельзя оплатить");
   }
 
+  const months: BillingPeriodMonths = params.months ?? 1;
   const plan = planById(params.plan);
-  const effectiveAmountUzs =
+  const baseMonthlyPrice =
     business.customPriceUzs !== null &&
     business.customPriceUzs !== undefined &&
     business.customPriceUzs > 0
       ? business.customPriceUzs
       : plan.priceUzs;
 
+  const customDiscount = business.settings?.discountPercent ?? 0;
+  const pricing = calculatePlanPrice({
+    baseMonthlyPrice,
+    months,
+    customDiscountPercent: customDiscount,
+  });
+  const effectiveAmountUzs = pricing.totalAmountUzs;
+
   const externalId = randomUUID();
   const db = await getDb();
 
   let url = `/pay/${externalId}`;
-  let payload: Record<string, unknown> = {};
+  let payload: Record<string, unknown> = {
+    months,
+    discountPercent: pricing.discountPercent,
+    baseMonthlyPrice,
+    savingsUzs: pricing.savingsUzs,
+  };
 
   if (provider === "PAYME") {
     const checkoutUrl = buildPaymeCheckoutUrl(plan, externalId, effectiveAmountUzs);
     if (!checkoutUrl) throw new Error("Payme не настроен");
     url = checkoutUrl;
-    payload = { checkoutUrl };
+    payload.checkoutUrl = checkoutUrl;
   } else if (provider === "CLICK") {
     const checkoutUrl = buildClickCheckoutUrl(plan, externalId, effectiveAmountUzs);
     if (!checkoutUrl) throw new Error("Click не настроен");
     url = checkoutUrl;
-    payload = { checkoutUrl };
+    payload.checkoutUrl = checkoutUrl;
   } else if (provider === "CRYPTO") {
     const { cryptoDepositConfig } = await import("./config");
     const conf = cryptoDepositConfig();
@@ -86,6 +103,7 @@ export async function createPayment(params: {
     const cryptoAmount = Number((effectiveAmountUzs / conf.rateUzs).toFixed(2));
     url = `/pay/${externalId}`;
     payload = {
+      ...payload,
       asset: conf.asset,
       network: conf.network,
       depositAddress: conf.address,
@@ -237,13 +255,18 @@ export async function completePayment(params: {
       .limit(1)
       .for("update");
 
+    const paymentPayload = (payment.payload ?? {}) as Record<string, unknown>;
+    const rawMonths = Number(paymentPayload.months) || 1;
+    const months = ([1, 3, 6, 12].includes(rawMonths) ? rawMonths : 1) as BillingPeriodMonths;
+    const periodDurationMs = months * 30 * 24 * 60 * 60 * 1000;
+
     const plan = planById(payment.plan);
     const now = new Date();
     const base =
       active?.currentPeriodEnd && active.currentPeriodEnd.getTime() > now.getTime()
         ? active.currentPeriodEnd
         : now;
-    const periodEnd = new Date(base.getTime() + PERIOD_MS);
+    const periodEnd = new Date(base.getTime() + periodDurationMs);
 
     if (payment.status === "PAID") {
       return {
@@ -313,6 +336,11 @@ export async function completePayment(params: {
         and(eq(subscriptions.businessId, business.id), eq(subscriptions.status, "ACTIVE")),
       );
 
+    const planName = business.settings?.customPlanName || plan.name;
+    const periodText = months === 1 ? "1 месяц" : months === 12 ? "1 год" : `${months} месяца`;
+    const discountText = paymentPayload.discountPercent ? ` (скидка ${paymentPayload.discountPercent}%)` : "";
+    const baseOnlineNote = `Тариф «${planName}» на ${periodText}${discountText} · Оплачено онлайн (${payment.provider})`;
+
     if (pendingSub) {
       // Cancel any other older PENDING rows if present
       await tx
@@ -342,8 +370,8 @@ export async function completePayment(params: {
           startedAt: now,
           currentPeriodEnd: periodEnd,
           note: pendingSub.note
-            ? `${pendingSub.note} · Оплачено онлайн (${payment.provider})`
-            : `Онлайн-оплата · ${payment.provider}`,
+            ? `${pendingSub.note} · ${baseOnlineNote}`
+            : baseOnlineNote,
         })
         .where(eq(subscriptions.id, pendingSub.id));
     } else {
@@ -361,7 +389,7 @@ export async function completePayment(params: {
         providerPayoutAmount,
         startedAt: now,
         currentPeriodEnd: periodEnd,
-        note: `Онлайн-оплата · ${payment.provider}`,
+        note: baseOnlineNote,
       });
     }
 

@@ -46,6 +46,8 @@ export type PublicBusiness = {
   categories: { name: string; count: number }[];
   pageSections: PublicPageSection[];
   gallery: PublicGalleryImage[];
+  isSuspended?: boolean;
+  suspensionReason?: "trial_expired" | "business_suspended" | null;
 };
 
 export async function getBusinessBySlug(slug: string): Promise<Business | null> {
@@ -62,7 +64,25 @@ export async function getBusinessBySlug(slug: string): Promise<Business | null> 
 export async function getPublicBusiness(slug: string): Promise<PublicBusiness | null> {
   const db = await getDb();
   const business = await getBusinessBySlug(slug);
-  if (!business || business.status !== "ACTIVE") return null;
+  if (!business) return null;
+
+  const isTrialExpired =
+    business.plan === "TRIAL" &&
+    Boolean(business.trialEndsAt) &&
+    (business.trialEndsAt as Date).getTime() < Date.now();
+
+  if (business.status !== "ACTIVE" || isTrialExpired) {
+    return {
+      business,
+      services: [],
+      staff: [],
+      categories: [],
+      pageSections: [],
+      gallery: [],
+      isSuspended: true,
+      suspensionReason: isTrialExpired ? "trial_expired" : "business_suspended",
+    };
+  }
 
   const [serviceRows, staffRows, links, sections, galleryRows] = await Promise.all([
     db
