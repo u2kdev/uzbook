@@ -17,7 +17,7 @@ import { Reveal } from "@/components/reveal";
 import { TrustedLogosCarousel } from "@/components/trusted-logos-carousel";
 import { AnimatedCreateButton } from "@/components/ui/animated-create-button";
 import { getTrustedLogos } from "@/server/actions/logos";
-import { PLANS, formatMoney } from "@/lib/plans";
+import { PricingSection } from "@/components/pricing-section";
 
 export const dynamic = "force-dynamic";
 
@@ -385,86 +385,7 @@ export default async function HomePage() {
         </section>
 
         {/* ---------------------------------------------------------------- */}
-        <section id="pricing" className="container-page py-24 sm:py-32">
-          <Reveal className="text-center">
-            <span className="badge">Тарифы</span>
-            <h2 className="mx-auto mt-5 max-w-2xl text-[clamp(2rem,4.4vw,3rem)] leading-[1.06] font-semibold">
-              Платите за команду, а не за каждую запись
-            </h2>
-            <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-muted">
-              На старте оплату подтверждает менеджер — карта, крипта или счёт.
-              Позже подключим автоматические платежи.
-            </p>
-          </Reveal>
-
-          <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {PLANS.map((plan, index) => (
-              <Reveal key={plan.id} delay={index * 70}>
-                <div
-                  className={`flex h-full flex-col rounded-[28px] p-1.5 ring-1 ${
-                    plan.highlighted
-                      ? "bg-ink/10 ring-ink/10"
-                      : "bg-white/60 ring-black/[0.05]"
-                  }`}
-                >
-                  <div
-                    className={`flex h-full flex-col rounded-[calc(28px-6px)] p-7 ${
-                      plan.highlighted
-                        ? "bg-ink text-white ring-1 ring-white/10"
-                        : "bg-white ring-1 ring-black/[0.03]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-[15px] font-semibold">{plan.name}</p>
-                      {plan.highlighted && (
-                        <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium tracking-wide uppercase">
-                          Выбор салонов
-                        </span>
-                      )}
-                    </div>
-                    <p
-                      className={`mt-1 text-[12.5px] ${plan.highlighted ? "text-white/60" : "text-muted"}`}
-                    >
-                      {plan.tagline}
-                    </p>
-                    <div className="mt-7 flex items-end gap-1.5">
-                      <span className="text-[28px] leading-none font-semibold tracking-tight">
-                        {plan.priceUzs === 0 ? "0" : formatMoney(plan.priceUzs)}
-                      </span>
-                      <span
-                        className={`pb-0.5 text-[12px] ${plan.highlighted ? "text-white/55" : "text-muted"}`}
-                      >
-                        {plan.period}
-                      </span>
-                    </div>
-                    <ul className="mt-7 space-y-2.5">
-                      {plan.features.map((feature) => (
-                        <li key={feature} className="flex items-start gap-2 text-[13px]">
-                          <Check
-                            size={15}
-                            strokeWidth={1.8}
-                            className={plan.highlighted ? "mt-0.5 text-brand" : "mt-0.5 text-mint"}
-                          />
-                          <span className={plan.highlighted ? "text-white/80" : "text-ink-soft"}>
-                            {feature}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    <Link
-                      href="/register"
-                      className={`btn mt-8 w-full ${
-                        plan.highlighted ? "btn-accent" : "btn-ghost"
-                      }`}
-                    >
-                      {plan.priceUzs === 0 ? "Начать бесплатно" : "Выбрать тариф"}
-                    </Link>
-                  </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </section>
+        <PricingSection />
 
         {/* ---------------------------------------------------------------- */}
         <section className="container-page pb-24 sm:pb-32">
