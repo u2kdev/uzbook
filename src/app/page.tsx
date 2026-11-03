@@ -7,7 +7,6 @@ import {
   Clock3,
   Copy,
   Link2,
-  Scissors,
   Sparkles,
   Store,
   UserRound,
@@ -18,6 +17,7 @@ import { TrustedLogosCarousel } from "@/components/trusted-logos-carousel";
 import { AnimatedCreateButton } from "@/components/ui/animated-create-button";
 import { getTrustedLogos } from "@/server/actions/logos";
 import { PricingSection } from "@/components/pricing-section";
+import { SiteFooter } from "@/components/site-footer";
 
 export const dynamic = "force-dynamic";
 
@@ -415,28 +415,7 @@ export default async function HomePage() {
         </section>
       </main>
 
-      <footer className="container-page pb-12">
-        <div className="flex flex-col gap-6 border-t border-line pt-8 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Logo />
-            <span className="text-[12px] text-muted">© {new Date().getFullYear()} uzbook.online</span>
-          </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12.5px] text-muted">
-            <Link href="/become-provider" className="font-semibold text-brand hover:underline">
-              Стать провайдером (партнёрская программа)
-            </Link>
-            <Link href="/login" className="hover:text-ink">
-              Вход
-            </Link>
-            <a href="mailto:hello@uzbook.online" className="hover:text-ink">
-              Поддержка
-            </a>
-            <span className="inline-flex items-center gap-1.5">
-              <Scissors size={13} strokeWidth={1.6} /> Сделано для мастеров
-            </span>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
