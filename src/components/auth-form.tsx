@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { ArrowRight, Loader2, Sparkles, User, Scissors, Headphones } from "lucide-react";
+import { ArrowRight, Loader2, Sparkles, Scissors, Headphones } from "lucide-react";
 import { loginAction, registerAction, type AuthState } from "@/app/(auth)/actions";
 
 const DEMO_ACCOUNTS = [
@@ -21,14 +21,6 @@ const DEMO_ACCOUNTS = [
     password: "barber1234",
     icon: Scissors,
     badge: "TRIAL",
-  },
-  {
-    role: "Личный кабинет",
-    name: "Салон Uzbek Beauty",
-    email: "uzbek@gmail.com",
-    password: "12345678",
-    icon: User,
-    badge: "АКТИВЕН",
   },
   {
     role: "Поддержка",
