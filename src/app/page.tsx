@@ -59,7 +59,7 @@ export default async function HomePage() {
   return (
     <div className="min-h-dvh overflow-x-clip bg-paper">
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(80%_50%_at_50%_-10%,rgba(110,86,248,0.14),transparent_60%),radial-gradient(50%_40%_at_100%_20%,rgba(18,184,134,0.08),transparent_60%)]" />
-      <div className="pointer-events-none fixed inset-0 z-0 opacity-60">
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
         <PathsBackdrop />
       </div>
 
