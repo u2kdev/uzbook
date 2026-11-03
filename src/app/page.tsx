@@ -15,6 +15,7 @@ import {
 import { Logo } from "@/components/logo";
 import { Reveal } from "@/components/reveal";
 import { TrustedLogosCarousel } from "@/components/trusted-logos-carousel";
+import { AnimatedCreateButton } from "@/components/ui/animated-create-button";
 import { getTrustedLogos } from "@/server/actions/logos";
 import { PLANS, formatMoney } from "@/lib/plans";
 
@@ -83,10 +84,7 @@ export default async function HomePage() {
             >
               Войти
             </Link>
-            <Link href="/register" className="btn btn-primary h-9 px-3.5 text-[13px] sm:h-10 sm:px-4">
-              <span className="hidden sm:inline">Создать страницу</span>
-              <span className="sm:hidden">Создать</span>
-            </Link>
+            <AnimatedCreateButton variant="header" href="/register" />
           </div>
         </div>
       </header>
@@ -114,12 +112,7 @@ export default async function HomePage() {
               </p>
 
               <div className="mt-9 flex flex-wrap items-center gap-3">
-                <Link href="/register" className="btn btn-primary group h-12 px-3 pl-6">
-                  Создать страницу салона
-                  <span className="grid size-8 place-items-center rounded-full bg-white/12 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-1 group-hover:-translate-y-px">
-                    <ArrowUpRight size={16} strokeWidth={1.6} />
-                  </span>
-                </Link>
+                <AnimatedCreateButton variant="hero" href="/register" />
                 <Link href="/atelier-noir" className="btn btn-ghost h-12">
                   Посмотреть пример
                 </Link>
@@ -490,12 +483,7 @@ export default async function HomePage() {
                   приходят сами.
                 </p>
                 <div className="mt-9 flex flex-wrap justify-center gap-3">
-                  <Link href="/register" className="btn group h-12 bg-white px-3 pl-6 text-ink">
-                    Создать страницу
-                    <span className="grid size-8 place-items-center rounded-full bg-ink/8 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-1 group-hover:-translate-y-px">
-                      <ArrowUpRight size={16} strokeWidth={1.6} />
-                    </span>
-                  </Link>
+                  <AnimatedCreateButton variant="cta" href="/register" />
                   <Link href="/atelier-noir" className="btn btn-ghost h-12 border-white/20 text-white hover:bg-white/10">
                     Пример страницы
                   </Link>
