@@ -314,36 +314,7 @@ export async function loginAction(_prev: AuthState, formData: FormData): Promise
     return { error: "Неверный логин (телефон / email / никнейм) или пароль." };
   }
 
-  let valid = await verifyPassword(parsed.data.password, user.passwordHash);
-  if (
-    !valid &&
-    (process.env.NODE_ENV !== "production" ||
-      [
-        "owner@uzbook.online",
-        "admin@uzbook.online",
-        "support@uzbook.online",
-        "demo@uzbook.online",
-        "barber@uzbook.online",
-        "provider@uzbook.online",
-        "uzbek@gmail.com",
-      ].includes(user.email))
-  ) {
-    const devPasswords = [
-      "secret123",
-      "owner1234",
-      "admin1234",
-      "support1234",
-      "demo1234",
-      "barber1234",
-      "provider1234",
-      "12345678",
-      "password",
-      "123456",
-    ];
-    if (devPasswords.includes(parsed.data.password)) {
-      valid = true;
-    }
-  }
+  const valid = await verifyPassword(parsed.data.password, user.passwordHash);
 
   if (!valid) {
     logger.warn("auth.login_failed", { userId: user.id, reason: "invalid_password", ip });

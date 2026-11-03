@@ -69,36 +69,7 @@ export async function POST(request: Request) {
       return apiError("invalid_credentials", "Неверный логин или пароль", 401);
     }
 
-    let passwordOk = await verifyPassword(password, user.passwordHash);
-    if (
-      !passwordOk &&
-      (process.env.NODE_ENV !== "production" ||
-        [
-          "owner@uzbook.online",
-          "admin@uzbook.online",
-          "support@uzbook.online",
-          "demo@uzbook.online",
-          "barber@uzbook.online",
-          "provider@uzbook.online",
-          "uzbek@gmail.com",
-        ].includes(user.email))
-    ) {
-      const devPasswords = [
-        "secret123",
-        "owner1234",
-        "admin1234",
-        "support1234",
-        "demo1234",
-        "barber1234",
-        "provider1234",
-        "12345678",
-        "123456",
-        "password",
-      ];
-      if (devPasswords.includes(password)) {
-        passwordOk = true;
-      }
-    }
+    const passwordOk = await verifyPassword(password, user.passwordHash);
     if (!passwordOk) {
       return apiError("invalid_credentials", "Неверный логин или пароль", 401);
     }

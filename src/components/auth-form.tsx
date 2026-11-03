@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { ArrowRight, Loader2, Sparkles, Shield, User, Scissors, Headphones } from "lucide-react";
+import { ArrowRight, Loader2, Sparkles, User, Scissors, Headphones } from "lucide-react";
 import { loginAction, registerAction, type AuthState } from "@/app/(auth)/actions";
 
 const DEMO_ACCOUNTS = [
@@ -10,7 +10,7 @@ const DEMO_ACCOUNTS = [
     role: "Владелец салона (PRO)",
     name: "Салон Atelier Noir · Полный дашборд",
     email: "owner@uzbook.online",
-    password: "secret123",
+    password: "owner1234",
     icon: Sparkles,
     badge: "PRO",
   },
@@ -18,7 +18,7 @@ const DEMO_ACCOUNTS = [
     role: "Барбершоп (TRIAL)",
     name: "Barber House · Записи и таймлайн",
     email: "barber@uzbook.online",
-    password: "secret123",
+    password: "barber1234",
     icon: Scissors,
     badge: "TRIAL",
   },
@@ -31,18 +31,10 @@ const DEMO_ACCOUNTS = [
     badge: "АКТИВЕН",
   },
   {
-    role: "Администратор",
-    name: "Пульт платформы · Тарифы и заявки",
-    email: "admin@uzbook.online",
-    password: "secret123",
-    icon: Shield,
-    badge: "ADMIN",
-  },
-  {
     role: "Поддержка",
     name: "Служба поддержки · Просмотр",
     email: "support@uzbook.online",
-    password: "secret123",
+    password: "support1234",
     icon: Headphones,
     badge: "SUPPORT",
   },
