@@ -13,7 +13,6 @@ import {
   UserRound,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
-import { PathsBackdrop } from "@/components/ui/background-paths";
 import { Reveal } from "@/components/reveal";
 import { TrustedLogosCarousel } from "@/components/trusted-logos-carousel";
 import { getTrustedLogos } from "@/server/actions/logos";
@@ -59,9 +58,6 @@ export default async function HomePage() {
   return (
     <div className="min-h-dvh overflow-x-clip bg-paper">
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(80%_50%_at_50%_-10%,rgba(110,86,248,0.14),transparent_60%),radial-gradient(50%_40%_at_100%_20%,rgba(18,184,134,0.08),transparent_60%)]" />
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <PathsBackdrop />
-      </div>
 
       <header className="sticky top-0 z-40 px-4 pt-4 sm:pt-6">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 rounded-full border border-white/60 bg-white/75 py-2.5 pr-2.5 pl-4 shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_18px_50px_-30px_rgba(11,11,16,0.45)] backdrop-blur-xl">
