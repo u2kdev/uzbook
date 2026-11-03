@@ -100,10 +100,20 @@ export async function getCurrentUser(): Promise<User | null> {
 export async function getMyBusiness() {
   const session = await requireUser();
   const db = await getDb();
-  const [business] = await db
+  let [business] = await db
     .select()
     .from(businesses)
     .where(eq(businesses.ownerId, session.id))
     .limit(1);
+
+  if (!business && process.env.NODE_ENV !== "production") {
+    const [defaultBiz] = await db
+      .select()
+      .from(businesses)
+      .where(eq(businesses.slug, "atelier-noir"))
+      .limit(1);
+    if (defaultBiz) business = defaultBiz;
+  }
+
   return { session, business: business ?? null, db };
 }

@@ -15,11 +15,23 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (session.role === "SUPPORT") redirect("/admin");
 
   const db = await getDb();
-  const [business] = await db
+  let [business] = await db
     .select()
     .from(businesses)
     .where(eq(businesses.ownerId, session.id))
     .limit(1);
+
+  // In development, if owner has no business, fallback to Atelier Noir so they are never trapped in onboarding
+  if (!business && process.env.NODE_ENV !== "production") {
+    const [defaultBiz] = await db
+      .select()
+      .from(businesses)
+      .where(eq(businesses.slug, "atelier-noir"))
+      .limit(1);
+    if (defaultBiz) {
+      business = defaultBiz;
+    }
+  }
 
   if (!business) {
     if (session.role === "ADMIN") redirect("/admin");
